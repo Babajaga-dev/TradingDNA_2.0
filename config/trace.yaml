@@ -20,6 +20,40 @@ console:
   enabled: true
   color: true
   detailed: false
+  visual: true  # Abilita il visual logging con Rich
+
+# Configurazione visual
+visual:
+  enabled: true
+  colors:
+    info: "cyan"
+    warning: "yellow"
+    error: "red bold"
+    critical: "red bold reverse"
+    success: "green bold"
+  progress:
+    spinner: true
+    elapsed_time: true
+    percentage: true
+  components:
+    dna:
+      icon: "🧬"
+      color: "blue"
+    immune:
+      icon: "🛡️"
+      color: "green"
+    metabolism:
+      icon: "⚡"
+      color: "yellow"
+    nervous:
+      icon: "🧠"
+      color: "cyan"
+    endocrine:
+      icon: "⚖️"
+      color: "magenta"
+    reproductive:
+      icon: "🔄"
+      color: "blue"
 
 # Configurazione per modulo
 modules:

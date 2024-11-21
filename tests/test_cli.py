@@ -43,13 +43,13 @@ def test_setup_argparse():
     assert args.file == 'test.yaml'
     
     # Test comando download
-    args = parser.parse_args(['download', 'BTC/USDT'])
+    args = parser.parse_args(['download', '--pair', 'BTC/USDT'])
     assert args.command == 'download'
     assert args.pair == 'BTC/USDT'
-    assert args.timeframe == '1h'  # default value
+    assert args.timeframe is None  # default value rimosso
     assert not args.progress
     
-    args = parser.parse_args(['download', 'ETH/USDT', '--timeframe', '4h', '--progress'])
+    args = parser.parse_args(['download', '--pair', 'ETH/USDT', '--timeframe', '4h', '--progress'])
     assert args.timeframe == '4h'
     assert args.progress
     
@@ -97,7 +97,7 @@ def test_handle_download():
     # Test download base
     args = MagicMock(
         pair='BTC/USDT',
-        timeframe='1h',
+        timeframe=None,
         progress=False,
         start=None,
         end=None
