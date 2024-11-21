@@ -11,9 +11,14 @@ global:
 file:
   enabled: true
   path: "logs"
-  max_size_mb: 10
+  max_size_kb: 400  # Limite massimo di 400KB per file
+  max_total_size_mb: 50  # Limite massimo totale directory logs
   backup_count: 5
   compress: true
+  retention:
+    days: 30  # Mantieni i log per 30 giorni
+    auto_clean: true  # Pulizia automatica dei log vecchi
+    compress_after_days: 7  # Comprimi i log più vecchi di 7 giorni
 
 # Configurazione console
 console:
@@ -101,12 +106,26 @@ alerts:
       email: false
       telegram: false
 
-# Performance logging
-performance:
+# Metriche di logging
+metrics:
   enabled: true
-  interval: 300  # secondi
-  metrics:
-    - cpu_usage
-    - memory_usage
-    - disk_usage
-    - network_latency
+  collection_interval: 300  # secondi
+  types:
+    log_counts:  # Conteggio per livello di log
+      enabled: true
+      reset_interval: 3600  # Reset contatori ogni ora
+    storage:  # Metriche storage
+      enabled: true
+      check_interval: 900  # Controllo ogni 15 minuti
+    errors:  # Metriche errori
+      enabled: true
+      mttf: true  # Mean Time To Failure
+      mttr: true  # Mean Time To Recovery
+    performance:  # Performance logging
+      enabled: true
+      measurements:
+        - cpu_usage
+        - memory_usage
+        - disk_usage
+        - log_write_latency
+        - rotation_time
