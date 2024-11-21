@@ -113,6 +113,17 @@ indicators:
   cache_enabled: true
   cache_size: 1000
   
+  # Pattern Recognition
+  pattern_recognition:
+    min_pattern_length: 5
+    max_pattern_length: 20
+    min_confidence: 0.7
+    similarity_threshold: 0.8
+    correlation_weight: 0.4
+    length_weight: 0.2
+    quality_threshold: 0.6
+    max_patterns: 1000
+    
   # Parametri calcolo
   computation:
     parallel: true
