@@ -123,6 +123,36 @@ indicators:
     length_weight: 0.2
     quality_threshold: 0.6
     max_patterns: 1000
+
+  # RSI
+  rsi:
+    period: 14
+    overbought: 70
+    oversold: 30
+    signal_threshold: 0.6
+    weight: 1.0
+
+  # MACD
+  macd:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+    signal_threshold: 0.0
+    weight: 1.0
+
+  # Bollinger Bands
+  bollinger:
+    period: 20
+    std_dev: 2
+    signal_threshold: 0.8
+    weight: 1.0
+
+  # Volume
+  volume:
+    period: 20
+    ma_type: "sma"
+    threshold: 1.5
+    weight: 1.0
     
   # Parametri calcolo
   computation:

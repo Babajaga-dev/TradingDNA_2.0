@@ -1,26 +1,17 @@
-"""Pattern Recognition System per DNA.
+"""Pattern Recognition DNA.
 
-Questo modulo implementa il sistema di riconoscimento pattern:
-- Identificazione pattern ricorrenti
-- Analisi serie temporali
-- Correlazione pattern-risultati
+Questo modulo implementa il riconoscimento di pattern nei prezzi
+attraverso tecniche di normalizzazione e correlazione.
 """
-from typing import Dict, List, Optional, Tuple
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-from scipy import stats
-from dataclasses import dataclass
-
-from .base import Gene
-from utils.logger import get_component_logger
-
-# Setup logger
-logger = get_component_logger('PatternRecognition')
+from typing import List
+from core.dna.base import BaseGene
 
 @dataclass
 class Pattern:
-    """Struttura dati per pattern identificati."""
-    
+    """Rappresenta un pattern identificato nella serie storica."""
     sequence: np.ndarray
     start_idx: int
     end_idx: int
@@ -28,98 +19,107 @@ class Pattern:
     correlation: float
     quality_score: float
 
-class PatternRecognition(Gene):
-    """Sistema di riconoscimento pattern di mercato."""
+class PatternRecognition(BaseGene):
+    """Gene per il riconoscimento di pattern nei prezzi."""
     
-    def __init__(self):
-        """Inizializza il sistema di pattern recognition."""
-        super().__init__('pattern_recognition')
-        
-        # Pattern storage
+    def __init__(self) -> None:
+        """Inizializza il gene di pattern recognition."""
+        super().__init__("pattern_recognition")
+        self.min_pattern_length = 5
+        self.max_pattern_length = 20
+        self.min_confidence = 0.7
         self.patterns: List[Pattern] = []
-        self.min_pattern_length = self.params.get('min_pattern_length', 5)
-        self.max_pattern_length = self.params.get('max_pattern_length', 20)
-        self.min_confidence = self.params.get('min_confidence', 0.7)
         
-        logger.info(f"Inizializzato Pattern Recognition con parametri: {self.params}")
+    def _normalize_prices(self, prices: np.ndarray) -> np.ndarray:
+        """Normalizza i prezzi usando z-score."""
+        return (prices - np.mean(prices)) / np.std(prices)
+        
+    def _calculate_similarity(self, pattern1: np.ndarray, pattern2: np.ndarray) -> float:
+        """Calcola la similarità tra due pattern usando correlazione."""
+        # Normalizza entrambi i pattern
+        norm1 = self._normalize_prices(pattern1)
+        norm2 = self._normalize_prices(pattern2)
+        
+        # Calcola correlazione e prendi il valore assoluto
+        correlation = np.corrcoef(norm1, norm2)[0,1]
+        return abs(correlation)
+        
+    def _calculate_future_correlation(self, data: pd.DataFrame, 
+                                   start_idx: int, length: int) -> float:
+        """Calcola la correlazione con il pattern successivo."""
+        if start_idx + 2*length > len(data):
+            return 0
+            
+        current = data['close'].values[start_idx:start_idx+length]
+        future = data['close'].values[start_idx+length:start_idx+2*length]
+        
+        return self._calculate_similarity(current, future)
+        
+    def _calculate_pattern_quality(self, similarity: float, 
+                                correlation: float, length: int) -> float:
+        """Calcola lo score di qualità del pattern."""
+        # Normalizza la lunghezza tra 0 e 1
+        length_factor = 1 - (length - self.min_pattern_length) / (
+            self.max_pattern_length - self.min_pattern_length)
+            
+        # Pesi per ciascun fattore
+        similarity_weight = 0.4
+        correlation_weight = 0.4
+        length_weight = 0.2
+        
+        # Calcola score pesato
+        quality = (similarity * similarity_weight + 
+                  abs(correlation) * correlation_weight + 
+                  length_factor * length_weight)
+                  
+        return quality
         
     def calculate(self, data: pd.DataFrame) -> np.ndarray:
-        """Calcola i pattern sulla serie temporale.
+        """Calcola gli score di pattern recognition."""
+        prices = data['close'].values
+        n = len(prices)
+        scores = np.zeros(n)
+        self.patterns = []
         
-        Args:
-            data: DataFrame con dati OHLCV
+        # Per ogni possibile lunghezza di pattern
+        for length in range(self.min_pattern_length, 
+                          min(self.max_pattern_length, n//2)):
             
-        Returns:
-            Array con score di pattern per ogni punto
-        """
-        if len(data) < self.min_pattern_length:
-            return np.zeros(len(data))
-            
-        # Normalizza prezzi per confronto pattern
-        prices = self._normalize_prices(data['close'].values)
-        pattern_scores = np.zeros(len(prices))
-        
-        # Identifica pattern per diverse lunghezze
-        for length in range(self.min_pattern_length, min(self.max_pattern_length, len(prices))):
-            current_pattern = prices[-length:]
-            
-            # Cerca pattern simili nella storia
-            for i in range(len(prices) - length):
-                historical_pattern = prices[i:i+length]
-                similarity = self._calculate_similarity(current_pattern, historical_pattern)
+            # Per ogni possibile punto di inizio
+            for i in range(n - length):
+                pattern = prices[i:i+length]
                 
-                if similarity > self.min_confidence:
-                    # Calcola correlazione con rendimenti futuri
-                    future_correlation = self._calculate_future_correlation(
-                        data, i+length, len(prices)-length)
+                # Cerca pattern simili nella serie storica
+                for j in range(i + length, n - length):
+                    candidate = prices[j:j+length]
+                    similarity = self._calculate_similarity(pattern, candidate)
                     
-                    # Calcola quality score
-                    quality = self._calculate_pattern_quality(
-                        similarity, future_correlation, length)
-                    
-                    pattern = Pattern(
-                        sequence=historical_pattern,
-                        start_idx=i,
-                        end_idx=i+length,
-                        confidence=similarity,
-                        correlation=future_correlation,
-                        quality_score=quality
-                    )
-                    self.patterns.append(pattern)
-                    pattern_scores[i:i+length] = max(pattern_scores[i:i+length], quality)
-        
-        return pattern_scores
+                    if similarity >= self.min_confidence:
+                        # Calcola correlazione con pattern futuro
+                        correlation = self._calculate_future_correlation(
+                            data, i, length)
+                            
+                        # Calcola qualità pattern
+                        quality = self._calculate_pattern_quality(
+                            similarity, correlation, length)
+                            
+                        # Memorizza il pattern
+                        self.patterns.append(Pattern(
+                            sequence=pattern,
+                            start_idx=i,
+                            end_idx=i+length,
+                            confidence=similarity,
+                            correlation=correlation,
+                            quality_score=quality
+                        ))
+                        
+                        # Aggiorna scores
+                        scores[i:i+length] = max(scores[i:i+length], quality)
+                        
+        return scores
         
     def generate_signal(self, data: pd.DataFrame) -> float:
-        """Genera segnale di trading basato sui pattern.
-        
-        Args:
-            data: DataFrame con dati OHLCV
-            
-        Returns:
-            Segnale di trading: -1 (sell), 0 (hold), 1 (buy)
-        """
-        if len(data) < self.min_pattern_length:
-            return 0
-            
-        # Calcola pattern scores
-        pattern_scores = self.calculate(data)
-        
-        if not len(self.patterns):
-            return 0
-            
-        # Analizza ultimi pattern identificati
-        recent_patterns = [p for p in self.patterns 
-                         if p.end_idx > len(data) - self.max_pattern_length]
-                         
-        if not recent_patterns:
-            return 0
-            
-        # Calcola segnale composito
-        signal = 0
-        total_weight = 0
-        
-        for pattern in recent_patterns:
+        """Genera un segnale di trading basato sui pattern identificati."""
             # Peso basato su qualità e correlazione
             weight = pattern.quality_score * abs(pattern.correlation)
             signal += np.sign(pattern.correlation) * weight

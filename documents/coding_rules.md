@@ -7,6 +7,9 @@
 - Un modulo/classe per file
 - Nome file descrittivo in snake_case
 - Estensione .py per Python, .yaml per configurazioni
+- CLI
+- metriche
+- Livelli debug
 
 ### Directory
 - Massimo 2 livelli di profondità

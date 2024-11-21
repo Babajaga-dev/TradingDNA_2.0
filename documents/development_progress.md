@@ -8,17 +8,17 @@ Current Sprint: DNA System
 ```python
 status = {
     "current_step": 4,
-    "current_task": "indicators_genes",
-    "overall_progress": "55%",
-    "sprint_progress": "70%",
-    "last_update": "2024-01-21"
+    "current_task": "strategy_composition",
+    "overall_progress": "60%",
+    "sprint_progress": "75%",
+    "last_update": "2024-01-22"
 }
 ```
 
 ## Implementation Steps
 
 ### Step 4: DNA Core [IN PROGRESS]
-Status: 70%
+Status: 75%
 Priority: 4
 Dependencies: Step 3
 ```python
@@ -48,15 +48,27 @@ tasks = {
         ]
     },
     "indicators_genes": {
-        "status": "in_progress",
-        "progress": 0,
+        "status": "completed",
+        "progress": 100,
         "command": "python main.py dna indicators",
         "output": "Indicators mapped to genes",
         "acceptance_criteria": [
-            "RSI gene",
-            "MACD gene",
-            "Bollinger gene",
-            "Volume gene",
+            "RSI gene ✓",
+            "MACD gene ✓",
+            "Bollinger gene ✓",
+            "Volume gene ✓",
+            "Test coverage ✓"
+        ]
+    },
+    "strategy_composition": {
+        "status": "in_progress",
+        "progress": 0,
+        "command": "python main.py dna compose",
+        "output": "Strategy composition ready",
+        "acceptance_criteria": [
+            "Gene combination",
+            "Signal weighting",
+            "Strategy validation",
             "Test coverage"
         ]
     },
@@ -172,10 +184,7 @@ def check_acceptance_criteria(step_number: int, task_name: str):
 7. Update progress tracking
 
 ## Latest Updates
-- Completata documentazione completa del sistema
-- Implementato menu interattivo con workflow guidato
-- Completata implementazione Pattern Recognition
-- Integrato Pattern Recognition con CLI
-- Risolti problemi di importazione circolare
-- Aggiornata struttura del progetto
-- Prossimo task: Implementazione indicators_genes con RSI, MACD, Bollinger e Volume
+- Completata implementazione indicatori come geni (RSI, MACD, Bollinger, Volume)
+- Aggiunti test unitari completi per ogni gene
+- Aggiornata configurazione in dna.yaml
+- Prossimo task: Implementazione strategy_composition per combinare i geni

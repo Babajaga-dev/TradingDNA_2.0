@@ -13,7 +13,7 @@ from cli.handlers.download import handle_download
 from cli.handlers.config import handle_config
 from utils.logger import get_component_logger
 from utils.initializer import Initializer, InitializationError
-from core.dna import DNA
+from core.dna import DNA, RSIGene, MACDGene, BollingerGene, VolumeGene
 from core.dna.pattern_recognition import PatternRecognition
 
 # Setup logger
@@ -96,11 +96,24 @@ def handle_dna(args):
         dna = DNA()  # Inizializza il sistema DNA
         
         if args.action == "init":
-            # Inizializza DNA con Pattern Recognition
-            gene = PatternRecognition()
-            dna.add_gene(gene)
-            logger.info("Inizializzato DNA con Pattern Recognition")
-            print_success("DNA inizializzato con Pattern Recognition")
+            # Inizializza DNA con tutti i geni
+            genes = [
+                PatternRecognition(),
+                RSIGene(),
+                MACDGene(),
+                BollingerGene(),
+                VolumeGene()
+            ]
+            
+            with show_progress("Inizializzazione DNA") as progress:
+                task = progress.add_task("Aggiunta geni...", total=len(genes))
+                for gene in genes:
+                    dna.add_gene(gene)
+                    progress.update(task, advance=1)
+                    time.sleep(0.1)
+                    
+            logger.info("DNA inizializzato con tutti i geni")
+            print_success("DNA inizializzato con successo")
             
         elif args.action == "analyze":
             # Verifica presenza gene Pattern Recognition
@@ -146,8 +159,67 @@ def handle_dna(args):
             print_success("Analisi pattern completata")
             
         elif args.action == "indicators":
-            logger.warning("Indicatori tecnici non ancora implementati")
-            print_error("Indicatori tecnici - Funzionalità in sviluppo")
+            if not dna.genes:
+                logger.warning("Nessun gene presente")
+                print_error("Esegui 'dna init' prima di usare gli indicatori")
+                return
+                
+            # Carica dati
+            pair = args.pair or "BTC/USDT"
+            timeframe = args.timeframe or "1h"
+            data_path = Path(f"data/market/{pair.replace('/', '_')}_{timeframe}_training.parquet")
+            
+            if not data_path.exists():
+                logger.error(f"File dati non trovato: {data_path}")
+                print_error(f"Dati non trovati per {pair} {timeframe}")
+                return
+                
+            data = pd.read_parquet(data_path)
+            logger.info(f"Caricati {len(data)} dati per analisi indicatori")
+            
+            # Calcola segnali per ogni indicatore
+            table = Table(title=f"Analisi Indicatori ({pair} {timeframe})", show_header=True)
+            table.add_column("Indicatore", style="cyan")
+            table.add_column("Ultimo Segnale", style="yellow")
+            table.add_column("Ultimo Valore", style="green")
+            
+            with show_progress("Calcolo Indicatori") as progress:
+                task = progress.add_task("Analisi...", total=len(dna.genes))
+                
+                for name, gene in dna.genes.items():
+                    if isinstance(gene, (RSIGene, MACDGene, BollingerGene, VolumeGene)):
+                        signal = gene.generate_signal(data)
+                        signal_map = {1: "🟢 BUY", 0: "⚪ HOLD", -1: "🔴 SELL"}
+                        
+                        if isinstance(gene, RSIGene):
+                            value = gene.calculate(data)[-1]
+                            table.add_row(name, signal_map[signal], f"RSI: {value:.2f}")
+                            
+                        elif isinstance(gene, MACDGene):
+                            values = gene.calculate(data)
+                            hist = values['histogram'][-1]
+                            table.add_row(name, signal_map[signal], f"Hist: {hist:.4f}")
+                            
+                        elif isinstance(gene, BollingerGene):
+                            bands = gene.calculate(data)
+                            last_close = data['close'].iloc[-1]
+                            upper = bands['upper'][-1]
+                            lower = bands['lower'][-1]
+                            b_value = (last_close - lower)/(upper - lower)
+                            table.add_row(name, signal_map[signal], f"%B: {b_value:.2f}")
+                            
+                        elif isinstance(gene, VolumeGene):
+                            metrics = gene.calculate(data)
+                            ratio = metrics['volume_ratio'][-1]
+                            table.add_row(name, signal_map[signal], f"Vol Ratio: {ratio:.2f}")
+                            
+                    progress.update(task, advance=1)
+                    time.sleep(0.1)
+            
+            console.print("\n")
+            console.print(table)
+            logger.info("Analisi indicatori completata")
+            print_success("Analisi indicatori completata")
             
         elif args.action == "score":
             if not dna.genes:
