@@ -1,0 +1,78 @@
+# Logging Configuration
+
+# Configurazione globale
+global:
+  log_level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  date_format: "%Y-%m-%d %H:%M:%S"
+  encoding: "utf-8"
+
+# Configurazione file di log
+file:
+  enabled: true
+  path: "logs"
+  max_size_mb: 10
+  backup_count: 5
+  compress: true
+
+# Configurazione console
+console:
+  enabled: true
+  color: true
+  detailed: false
+
+# Configurazione per modulo
+modules:
+  dna:
+    level: "DEBUG"
+    file: "dna.log"
+    console: true
+    
+  immune:
+    level: "INFO"
+    file: "immune.log"
+    console: true
+    
+  metabolism:
+    level: "INFO"
+    file: "metabolism.log"
+    console: true
+    
+  nervous:
+    level: "DEBUG"
+    file: "nervous.log"
+    console: true
+    
+  endocrine:
+    level: "INFO"
+    file: "endocrine.log"
+    console: true
+    
+  reproductive:
+    level: "INFO"
+    file: "reproductive.log"
+    console: true
+
+# Alert configuration
+alerts:
+  enabled: true
+  levels:
+    critical:
+      email: true
+      telegram: true
+    error:
+      email: false
+      telegram: true
+    warning:
+      email: false
+      telegram: false
+
+# Performance logging
+performance:
+  enabled: true
+  interval: 300  # secondi
+  metrics:
+    - cpu_usage
+    - memory_usage
+    - disk_usage
+    - network_latency

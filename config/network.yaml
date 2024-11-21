@@ -1,0 +1,46 @@
+# Network Configuration
+
+exchange:
+  name: "binance"
+  testnet: true
+  api:
+    key: ""  # Da configurare tramite variabili d'ambiente
+    secret: ""  # Da configurare tramite variabili d'ambiente
+  
+  # Parametri di connessione
+  connection:
+    timeout: 10000  # ms
+    max_retries: 3
+    retry_delay: 1000  # ms
+    keepalive: true
+
+  # Rate limiting
+  rate_limits:
+    max_requests_per_minute: 1200
+    max_orders_per_second: 10
+    max_positions: 50
+
+# Trading pairs configuration
+pairs:
+  - symbol: "BTC/USDT"
+    timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
+    min_qty: 0.0001
+    price_precision: 2
+    qty_precision: 8
+    
+  - symbol: "ETH/USDT"
+    timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
+    min_qty: 0.001
+    price_precision: 2
+    qty_precision: 8
+
+# WebSocket configuration
+websocket:
+  enabled: true
+  channels:
+    - trades
+    - klines
+    - book
+  buffer_size: 1000
+  reconnect: true
+  max_reconnects: 5

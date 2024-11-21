@@ -1,0 +1,156 @@
+# DNA System Configuration
+
+# Configurazione generale
+general:
+  name: "TradingDNA 2.0"
+  version: "2.0.0"
+  description: "Sistema di Trading Algoritmico Biologico"
+
+# Integrazione con altri sistemi biologici
+systems:
+  immune:
+    enabled: true
+    config_file: "config/immune.yaml"
+    risk_checks: true
+    
+  metabolism:
+    enabled: true
+    config_file: "config/metabolism.yaml"
+    capital_management: true
+    
+  nervous:
+    enabled: true
+    config_file: "config/nervous.yaml"
+    realtime_analysis: true
+    
+  endocrine:
+    enabled: true
+    config_file: "config/endocrine.yaml"
+    parameter_adaptation: true
+    
+  reproductive:
+    enabled: true
+    config_file: "config/reproductive.yaml"
+    strategy_evolution: true
+
+# Configurazione dati
+data:
+  # Training dataset
+  training:
+    pairs:
+      - symbol: "BTC/USDT"
+        timeframes: ["1h", "4h", "1d"]
+        candles: 5000  # Numero di candele per il training
+      - symbol: "ETH/USDT"
+        timeframes: ["1h", "4h", "1d"]
+        candles: 5000
+      
+  # Testing dataset  
+  testing:
+    pairs:
+      - symbol: "BTC/USDT"
+        timeframes: ["1h", "4h", "1d"]
+        candles: 1000  # Numero di candele per il testing
+      - symbol: "ETH/USDT"
+        timeframes: ["1h", "4h", "1d"]
+        candles: 1000
+      
+  # Paper trading dataset
+  paper_trading:
+    pairs:
+      - symbol: "BTC/USDT"
+        timeframes: ["1m", "5m", "15m", "1h"]
+        candles: 1000  # Numero di candele per paper trading
+      - symbol: "ETH/USDT"
+        timeframes: ["1m", "5m", "15m", "1h"]
+        candles: 1000
+
+# Configurazione strategie
+strategies:
+  base_path: "strategies/"
+  auto_discovery: true
+  validation_required: true
+  max_active: 5
+  
+  # Parametri evoluzione
+  evolution:
+    population_size: 100
+    generations: 50
+    mutation_rate: 0.1
+    crossover_rate: 0.8
+    
+  # Parametri validazione
+  validation:
+    min_trades: 100
+    min_win_rate: 0.55
+    min_profit_factor: 1.5
+    max_drawdown: 0.2
+
+# Configurazione indicatori
+indicators:
+  base_path: "indicators/"
+  auto_discovery: true
+  cache_enabled: true
+  cache_size: 1000
+  
+  # Parametri calcolo
+  computation:
+    parallel: true
+    max_workers: 4
+    batch_size: 1000
+
+# Configurazione segnali
+signals:
+  aggregation_method: "weighted"  # weighted, majority, unanimous
+  min_confidence: 0.7
+  confirmation_required: true
+  
+  # Filtri
+  filters:
+    volatility:
+      enabled: true
+      min_atr: 0.01
+      max_atr: 0.05
+    volume:
+      enabled: true
+      min_volume: 1000000
+    trend:
+      enabled: true
+      lookback_periods: 20
+
+# Configurazione backtest
+backtest:
+  engine: "vectorized"  # vectorized, event_driven
+  commission: 0.001  # 0.1%
+  slippage: 0.0005  # 0.05%
+  
+  # Parametri report
+  reporting:
+    save_trades: true
+    plot_equity: true
+    metrics:
+      - "sharpe_ratio"
+      - "sortino_ratio"
+      - "max_drawdown"
+      - "win_rate"
+      - "profit_factor"
+
+# Configurazione ottimizzazione
+optimization:
+  method: "genetic"  # genetic, grid, random
+  parallel: true
+  max_workers: 4
+  
+  # Parametri ottimizzazione
+  parameters:
+    population_size: [50, 100, 200]
+    generations: [30, 50, 100]
+    mutation_rate: [0.05, 0.1, 0.2]
+    crossover_rate: [0.6, 0.8, 0.9]
+
+# Configurazione logging
+logging:
+  level: "INFO"
+  file_enabled: true
+  console_enabled: true
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
