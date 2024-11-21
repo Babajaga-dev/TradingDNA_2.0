@@ -35,6 +35,26 @@ systems:
 
 # Configurazione dati
 data:
+  # Percorsi base
+  base_path: "data/market/"
+  
+  # Ratio split dataset
+  split_ratios:
+    training: 0.7
+    validation: 0.15
+    testing: 0.15
+    
+  # Validazione dati
+  validation:
+    check_missing: true
+    check_ordering: true
+    required_columns:
+      - "open"
+      - "high"
+      - "low"
+      - "close"
+      - "volume"
+  
   # Training dataset
   training:
     pairs:

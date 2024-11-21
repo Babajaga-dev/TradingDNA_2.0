@@ -1,201 +1,75 @@
 # TradingDNA 2.0 Development Progress
 
 ## Development Tracking
-Last Completed: Step 2 - Error Handling
-Next Task: Step 3 - Data Download
-Current Sprint: Basic Infrastructure
+Current Step: Step 4 - DNA Core Implementation
+Current Sprint: DNA System
 
 ## Quick Status
 ```python
 status = {
-    "current_step": 2,
-    "current_task": "exchange_connection",
-    "overall_progress": "30%",
-    "sprint_progress": "90%",
+    "current_step": 4,
+    "current_task": "dna_core",
+    "overall_progress": "40%",
+    "sprint_progress": "45%",
     "last_update": "2024-01-11"
 }
 ```
 
 ## Implementation Steps
 
-### Step 1: Basic Infrastructure [COMPLETED]
-Status: 100%
-Priority: 1
-Dependencies: None
+### Step 4: DNA Core [IN PROGRESS]
+Status: 45%
+Priority: 4
+Dependencies: Step 3
 ```python
 tasks = {
-    "project_structure": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python setup.py init",
-        "output": "Project structure created successfully",
+    "dna_structure": {
+        "status": "in_progress",
+        "progress": 80,
+        "command": "python main.py dna init",
+        "output": "DNA structure initialized",
         "acceptance_criteria": [
-            "Directory structure created ✓",
-            "Basic files initialized ✓",
-            "Git repository setup ✓"
-        ]
-    },
-    "basic_cli": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py --help",
-        "output": "Available commands: [init, download, train...]",
-        "acceptance_criteria": [
-            "CLI framework setup ✓",
-            "Basic commands working ✓",
-            "Help documentation ✓",
-            "Progress bars implemented ✓",
-            "DNA configuration system ✓"
-        ]
-    },
-    "config_system": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py config validate",
-        "output": "Configuration validated successfully",
-        "acceptance_criteria": [
-            "YAML config loading ✓",
-            "Config validation ✓",
-            "Default values ✓",
-            "DNA system configuration ✓",
-            "Dataset configuration ✓"
-        ]
-    },
-    "logging_setup": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py log test",
-        "output": "Logging system initialized",
-        "acceptance_criteria": [
-            "Log file creation ✓",
-            "Log rotation ✓",
-            "Log levels working ✓",
-            "Visual logging ✓",
-            "Progress bars ✓",
-            "Component loggers ✓"
-        ]
-    },
-    "test_framework": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python -m pytest",
-        "output": "All tests passed successfully",
-        "acceptance_criteria": [
-            "Pytest setup ✓",
-            "Basic tests running ✓",
-            "Coverage report ✓"
-        ]
-    }
-}
-```
-
-### Step 2: Exchange Connection [IN PROGRESS]
-Status: 90%
-Priority: 2
-Dependencies: Step 1
-```python
-tasks = {
-    "exchange_config": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py exchange setup",
-        "output": "Exchange configuration completed",
-        "acceptance_criteria": [
-            "API keys configuration ✓",
-            "Exchange parameters setup ✓",
-            "Connection test ✓",
-            "YAML configuration ✓",
-            "Environment variables ✓"
-        ]
-    },
-    "api_wrapper": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python -m pytest tests/test_nerve_fetch.py",
-        "output": "All tests passed successfully",
-        "acceptance_criteria": [
-            "CCXT integration ✓",
-            "Error handling ✓",
-            "Rate limiting ✓",
-            "Retry mechanism ✓",
+            "Gene structure ✓",
+            "Pattern encoding",
+            "Strategy mapping ✓",
             "Test coverage ✓"
         ]
     },
-    "connection_test": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py exchange ping",
-        "output": "Exchange responded in 23ms",
+    "pattern_recognition": {
+        "status": "pending",
+        "progress": 0,
+        "command": "python main.py dna analyze",
+        "output": "Pattern analysis completed",
         "acceptance_criteria": [
-            "Latency check ✓",
-            "Connection stability ✓",
-            "Reconnection handling ✓",
-            "Status monitoring ✓",
+            "Pattern detection",
+            "Series analysis",
+            "Correlation scoring",
+            "Test coverage"
+        ]
+    },
+    "indicators_genes": {
+        "status": "pending",
+        "progress": 0,
+        "command": "python main.py dna indicators",
+        "output": "Indicators mapped to genes",
+        "acceptance_criteria": [
+            "RSI gene",
+            "MACD gene",
+            "Bollinger gene",
+            "Volume gene",
+            "Test coverage"
+        ]
+    },
+    "scoring_system": {
+        "status": "in_progress",
+        "progress": 70,
+        "command": "python main.py dna score",
+        "output": "DNA scoring system active",
+        "acceptance_criteria": [
+            "Performance metrics ✓",
+            "Gene fitness ✓",
+            "Strategy ranking ✓",
             "Test coverage ✓"
-        ]
-    },
-    "error_handling": {
-        "status": "completed",
-        "progress": 100,
-        "command": "python main.py exchange test-errors",
-        "output": "Error handling validated",
-        "acceptance_criteria": [
-            "API error handling ✓",
-            "Retry mechanism ✓",
-            "Error logging ✓"
-        ]
-    }
-}
-```
-
-### Step 3: Data Download [PENDING]
-Status: 0%
-Priority: 3
-Dependencies: Step 2
-```python
-tasks = {
-    "download_module": {
-        "status": "pending",
-        "progress": 0,
-        "command": "python main.py download BTC/USDT --timeframe 1h",
-        "output": "Download completed: 1000 candles",
-        "acceptance_criteria": [
-            "Download functionality",
-            "Progress tracking",
-            "Data validation"
-        ]
-    },
-    "progress_tracking": {
-        "status": "pending",
-        "progress": 0,
-        "command": "python main.py download --progress",
-        "output": "[━━━━━━━━━━] 100% Complete",
-        "acceptance_criteria": [
-            "Visual progress bar",
-            "ETA calculation",
-            "Speed indication"
-        ]
-    },
-    "data_validation": {
-        "status": "pending",
-        "progress": 0,
-        "command": "python main.py validate-data",
-        "output": "Data integrity verified",
-        "acceptance_criteria": [
-            "Data format check",
-            "Missing data detection",
-            "Integrity validation"
-        ]
-    },
-    "retry_mechanism": {
-        "status": "pending",
-        "progress": 0,
-        "command": "python main.py download --test-retry",
-        "output": "Retry mechanism working",
-        "acceptance_criteria": [
-            "Automatic retry",
-            "Backoff strategy",
-            "Failure reporting"
         ]
     }
 }
@@ -270,7 +144,8 @@ def check_acceptance_criteria(step_number: int, task_name: str):
 7. Update progress tracking
 
 ## Latest Updates
-- Completato error handling con sistema di eccezioni custom
-- Implementato rate limiter con test completi
-- Aggiunto backoff esponenziale per retry
-- Prossimo step: Data Download Module
+- Implementato sistema completo di metriche (gene, strategy, performance)
+- Aggiunto supporto per auto-tuning dei geni
+- Implementati test unitari per tutte le metriche
+- Completata struttura base DNA con gestione strategie
+- Prossimo task: Completare pattern_recognition e iniziare indicators_genes

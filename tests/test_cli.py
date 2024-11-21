@@ -8,13 +8,9 @@ import argparse
 # Aggiungo la directory root al path per importare i moduli
 sys.path.append(str(Path(__file__).parent.parent))
 
-from main import (
-    setup_argparse,
-    handle_init,
-    handle_config,
-    handle_download,
-    handle_log
-)
+from main import setup_argparse
+from cli.commands import handle_init, handle_config, handle_download, handle_log
+from utils.initializer import Initializer
 
 def test_setup_argparse():
     """Test configurazione argparse"""
@@ -62,23 +58,29 @@ def test_setup_argparse():
     args = parser.parse_args(['log', 'test', '--module', 'core'])
     assert args.module == 'core'
 
-@patch('main.Initializer')
-def test_handle_init(mock_initializer):
+@patch('cli.commands.Initializer')  # Updated patch path to match where Initializer is imported
+def test_handle_init(mock_initializer_class):
     """Test gestione comando init"""
+    # Setup del mock per l'istanza
+    mock_instance = MagicMock()
+    mock_initializer_class.return_value = mock_instance
+    
     # Test inizializzazione normale
     args = MagicMock(force=False)
     handle_init(args)
-    mock_initializer.assert_called_once_with(force=False)
-    mock_initializer.return_value.initialize.assert_called_once()
+    mock_initializer_class.assert_called_once_with(force=False)
+    mock_instance.initialize.assert_called_once()
     
     # Test inizializzazione forzata
-    mock_initializer.reset_mock()
+    mock_initializer_class.reset_mock()
+    mock_instance.reset_mock()
     args = MagicMock(force=True)
     handle_init(args)
-    mock_initializer.assert_called_once_with(force=True)
+    mock_initializer_class.assert_called_once_with(force=True)
+    mock_instance.initialize.assert_called_once()
     
     # Test gestione errori
-    mock_initializer.return_value.initialize.side_effect = Exception("Test error")
+    mock_instance.initialize.side_effect = Exception("Test error")
     with pytest.raises(SystemExit):
         handle_init(args)
 
@@ -114,8 +116,30 @@ def test_handle_download():
     )
     handle_download(args)
 
-def test_handle_log():
+@patch('builtins.input')  # Mock builtins.input since rich.console.Console.input uses it internally
+@patch('cli.handlers.log.BaseExchange')  # Mock BaseExchange
+@patch('cli.handlers.log.DNADataDownloader')  # Mock DNADataDownloader
+def test_handle_log(mock_downloader_class, mock_exchange_class, mock_input):
     """Test gestione comando log"""
+    # Setup mocks
+    mock_exchange = MagicMock()
+    mock_exchange_class.return_value = mock_exchange
+    
+    mock_downloader = MagicMock()
+    mock_downloader_class.return_value = mock_downloader
+    
+    # Each handle_log call needs:
+    # 1. Menu choice ('0' to exit)
+    # 2. "Press ENTER to continue" prompt ('')
+    mock_input.side_effect = [
+        # First handle_log call
+        '0', '',
+        # Second handle_log call
+        '0', '',
+        # Third handle_log call
+        '0', ''
+    ]
+    
     # Test azione show
     args = MagicMock(action='show', module=None)
     handle_log(args)

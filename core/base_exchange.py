@@ -2,7 +2,7 @@
 Classe base per gestione exchange
 """
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 import yaml
 import ccxt
 from dotenv import load_dotenv
@@ -125,4 +125,25 @@ class BaseExchange:
             )
         except Exception as e:
             self.logger.error(f"Errore inizializzazione exchange: {str(e)}")
+            raise
+            
+    def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int) -> List[List[Any]]:
+        """
+        Scarica i dati OHLCV dall'exchange
+        
+        Args:
+            symbol: Simbolo trading (es. BTC/USDT)
+            timeframe: Timeframe (es. 1h, 4h, 1d)
+            limit: Numero di candele da scaricare
+            
+        Returns:
+            List[List[Any]]: Lista di candele OHLCV
+            
+        Raises:
+            Exception: Se ci sono errori nel download
+        """
+        try:
+            return self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
+        except Exception as e:
+            self.logger.error(f"Errore download OHLCV {symbol} {timeframe}: {str(e)}")
             raise
