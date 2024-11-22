@@ -8,9 +8,9 @@ from core.nervous_system import (
     NervousSystem, 
     MarketData, 
     NervousMetrics,
-    PaperDataStreamer
+    PaperDataStreamer,
+    NervousSystemError
 )
-from core.exceptions import NervousSystemError
 from utils.config import ConfigManager
 
 @pytest.fixture
@@ -159,12 +159,36 @@ def test_configuration_loading():
     for section in required_sections:
         assert section in config
 
-def test_error_handling(nervous_system):
+def test_error_handling(nervous_system, market_data):
     """Test error handling in various scenarios."""
-    # Test initialization error
-    with pytest.raises(NervousSystemError):
-        nervous_system._initialize_components = lambda: exec('raise NervousSystemError("Test error")')
-        nervous_system.__init__()
+    # Test con dati invalidi
+    invalid_data = MarketData(
+        timestamp=None,
+        price=float('nan'),  # Prezzo non valido
+        volume=-1.0,  # Volume negativo
+        trades=None,  # Trades non validi
+        orderbook=None  # Orderbook non valido
+    )
+    
+    result = nervous_system.process_market_data(invalid_data)
+    assert result['status'] == 'error'
+    assert 'message' in result
+    assert 'Invalid data' in result['message']
+    
+    # Test con pattern detection che fallisce
+    def mock_detect_patterns(self, data):
+        raise Exception("Pattern detection error")
+        
+    original_detect_patterns = nervous_system._detect_patterns
+    nervous_system._detect_patterns = mock_detect_patterns.__get__(nervous_system, NervousSystem)
+    
+    result = nervous_system.process_market_data(market_data)
+    assert result['status'] == 'error'
+    assert 'message' in result
+    assert 'Pattern detection error' in result['message']
+    
+    # Ripristina il metodo originale
+    nervous_system._detect_patterns = original_detect_patterns
 
 def test_preprocessing(nervous_system, market_data):
     """Test data preprocessing functionality."""

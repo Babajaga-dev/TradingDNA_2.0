@@ -57,8 +57,14 @@ class DNA:
     @classmethod
     def reset(cls) -> None:
         """Resetta lo stato del singleton per i test."""
+        if cls._instance is not None:
+            cls._instance.genes = {}
+            cls._instance.strategy_metrics = StrategyMetrics()
+            cls._instance.performance_metrics = PerformanceMetrics()
+            
         cls._instance = None
         cls._initialized = False
+        
         if cls._state_file.exists():
             try:
                 cls._state_file.unlink()
@@ -214,7 +220,7 @@ class DNA:
         
         if not self.genes:
             logger.warning("Nessun gene presente nel DNA")
-            return 0
+            return 0.0  # Ritorna esplicitamente 0.0 invece di 0
             
         start_time = time.time()
         signals = []
@@ -244,7 +250,7 @@ class DNA:
         # Gestione caso nessun segnale valido
         if not signals:
             logger.warning("Nessun segnale valido generato")
-            return 0
+            return 0.0  # Ritorna esplicitamente 0.0 invece di 0
         
         # Normalizza pesi con softmax
         weights = np.array(weights)
@@ -258,7 +264,7 @@ class DNA:
         self.performance_metrics.record_signal_latency(latency)
         
         logger.debug(f"Generato segnale strategia: {final_signal}")
-        return final_signal
+        return float(final_signal)  # Converti esplicitamente in float
         
     def validate_strategy(self, data: pd.DataFrame) -> Dict[str, float]:
         """Valida la strategia su un set di dati.

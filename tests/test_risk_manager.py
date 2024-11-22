@@ -126,8 +126,13 @@ def test_calculate_drawdown_protection(
     assert isinstance(protection, dict)
     assert 'stop_loss' in protection
     assert 'warning_level' in protection
+    assert 'take_profit' in protection
+    assert 'trailing_stop' in protection
+    assert 'scale_out_level' in protection
+    assert 'scale_in_level' in protection
     assert protection['stop_loss'] < sample_position['entry_price']
     assert protection['warning_level'] < sample_position['entry_price']
+    assert protection['take_profit'] > sample_position['entry_price']
 
 def test_exposure_calculation(risk_manager, sample_position, sample_portfolio):
     """Test position exposure calculation."""
