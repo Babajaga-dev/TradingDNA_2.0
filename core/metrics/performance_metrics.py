@@ -8,7 +8,7 @@ import psutil
 import numpy as np
 from collections import deque
 
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Setup logger
 logger = get_component_logger('Metrics.Performance')

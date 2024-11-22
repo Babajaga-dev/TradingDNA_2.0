@@ -6,7 +6,9 @@ import pytest
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from core.dna.base import Gene, DNA, GeneMetrics
+from core.dna.gene import Gene
+from core.dna.dna import DNA
+from core.metrics.gene_metrics import GeneMetrics
 
 class MockGene(Gene):
     """Gene di test che implementa RSI."""

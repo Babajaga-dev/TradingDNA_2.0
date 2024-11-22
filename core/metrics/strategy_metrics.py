@@ -6,7 +6,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Setup logger
 logger = get_component_logger('Metrics.Strategy')

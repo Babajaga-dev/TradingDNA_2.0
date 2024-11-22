@@ -137,21 +137,22 @@ indicators:
     fast_period: 12
     slow_period: 26
     signal_period: 9
-    signal_threshold: 0.0
+    signal_threshold: 0.6
     weight: 1.0
 
   # Bollinger Bands
   bollinger:
     period: 20
-    std_dev: 2
+    num_std: 2.0
     signal_threshold: 0.8
     weight: 1.0
 
   # Volume
   volume:
-    period: 20
-    ma_type: "sma"
-    threshold: 1.5
+    vwap_period: 14
+    volume_ma_period: 20
+    price_volume_ma_period: 30
+    signal_threshold: 0.6
     weight: 1.0
     
   # Parametri calcolo
@@ -198,16 +199,33 @@ backtest:
 
 # Configurazione ottimizzazione
 optimization:
-  method: "genetic"  # genetic, grid, random
+  method: "SLSQP"  # SLSQP per ottimizzazione vincolata
   parallel: true
   max_workers: 4
   
-  # Parametri ottimizzazione
-  parameters:
-    population_size: [50, 100, 200]
-    generations: [30, 50, 100]
-    mutation_rate: [0.05, 0.1, 0.2]
-    crossover_rate: [0.6, 0.8, 0.9]
+  # Bounds per ottimizzazione parametri
+  rsi:
+    period: [5, 30]
+    overbought: [60, 85]
+    oversold: [15, 40]
+    signal_threshold: [0.3, 0.9]
+    
+  macd:
+    fast_period: [5, 20]
+    slow_period: [15, 40]
+    signal_period: [5, 15]
+    signal_threshold: [0.3, 0.9]
+    
+  bollinger:
+    period: [10, 30]
+    num_std: [1.5, 3.0]
+    signal_threshold: [0.3, 0.9]
+    
+  volume:
+    vwap_period: [5, 30]
+    volume_ma_period: [10, 40]
+    price_volume_ma_period: [20, 50]
+    signal_threshold: [0.3, 0.9]
 
 # Configurazione logging
 logging:

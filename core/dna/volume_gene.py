@@ -1,76 +1,105 @@
-"""Gene per l'analisi del volume.
+"""Gene per l'analisi del Volume.
 
 Questo modulo implementa il gene Volume che calcola e genera segnali
 basati sull'analisi del volume degli scambi.
 """
-from typing import Dict
+from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
-from utils.logger import get_component_logger
-from core.dna.base import Gene
+from utils.logger_base import get_component_logger
+from core.dna.gene import Gene
 
 # Setup logger
 logger = get_component_logger('VolumeGene')
 
+def safe_divide(a, b, default=0):
+    """Divisione sicura per evitare divisioni per zero."""
+    return a / b if b != 0 else default
+
 class VolumeGene(Gene):
-    """Gene per l'analisi del volume degli scambi."""
+    """Gene per l'analisi del Volume."""
     
     def __init__(self) -> None:
         """Inizializza il gene Volume."""
         super().__init__("volume")
-        self.period: int = self.params.get('period', 20)
-        self.threshold: float = self.params.get('threshold', 1.5)
-        self.ma_type: str = self.params.get('ma_type', 'sma')
-        logger.info(
-            f"Inizializzato Volume con periodo {self.period}, "
-            f"threshold {self.threshold}, MA type {self.ma_type}"
-        )
+        self.vwap_period: int = self.params.get('vwap_period', 14)
+        self.volume_ma_period: int = self.params.get('volume_ma_period', 20)
+        self.price_volume_ma_period: int = self.params.get('price_volume_ma_period', 30)
+        self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
+        logger.info(f"Inizializzato Volume con periodi VWAP:{self.vwap_period}, Vol MA:{self.volume_ma_period}")
         
-    def calculate(self, data: pd.DataFrame) -> Dict[str, np.ndarray]:
-        """Calcola metriche sul volume.
+    def calculate(self, data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Calcola gli indicatori di volume.
         
         Args:
-            data: DataFrame con colonne 'volume' e 'close'
+            data: DataFrame con colonne OHLCV
             
         Returns:
-            Dict[str, np.ndarray]: Dictionary con:
-                - volume_ma: media mobile dei volumi
-                - volume_ratio: ratio volume corrente/media mobile
+            Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                - VWAP (Volume Weighted Average Price)
+                - Volume MA
+                - OBV (On Balance Volume)
                 
         Raises:
-            ValueError: Se mancano le colonne necessarie nel DataFrame
+            ValueError: Se mancano colonne necessarie nel DataFrame
         """
-        required_columns = ['volume', 'close']
-        missing_columns = [col for col in required_columns if col not in data.columns]
-        if missing_columns:
-            logger.error(f"Colonne mancanti nel DataFrame: {missing_columns}")
-            raise ValueError(
-                f"DataFrame deve contenere le colonne: {required_columns}"
-            )
+        required_columns = ['open', 'high', 'low', 'close', 'volume']
+        if not all(col in data.columns for col in required_columns):
+            logger.error("Colonne OHLCV mancanti nel DataFrame")
+            raise ValueError("DataFrame deve contenere le colonne OHLCV")
             
-        volume = data['volume'].values
+        # Calcola VWAP
+        typical_price = (data['high'] + data['low'] + data['close']) / 3
+        vwap = np.zeros(len(data))
         
-        # Calcola media mobile in base al tipo specificato
-        if self.ma_type == 'ema':
-            volume_ma = pd.Series(volume).ewm(span=self.period, adjust=False).mean()
-        else:  # default: sma
-            volume_ma = pd.Series(volume).rolling(window=self.period).mean()
+        for i in range(self.vwap_period-1, len(data)):
+            price_vol = typical_price.iloc[i-self.vwap_period+1:i+1] * data['volume'].iloc[i-self.vwap_period+1:i+1]
+            volume = data['volume'].iloc[i-self.vwap_period+1:i+1]
+            vwap[i] = np.sum(price_vol) / np.sum(volume)
             
-        # Calcola volume ratio (volume corrente / media mobile)
-        volume_ratio = np.zeros_like(volume)
-        valid_ma = volume_ma > 0  # evita divisione per zero
-        volume_ratio[valid_ma] = volume[valid_ma] / volume_ma[valid_ma]
+        # Calcola Volume MA
+        volume_ma = np.zeros(len(data))
+        for i in range(self.volume_ma_period-1, len(data)):
+            volume_ma[i] = np.mean(data['volume'].iloc[i-self.volume_ma_period+1:i+1])
+            
+        # Calcola OBV (On Balance Volume)
+        close_diff = data['close'].diff()
+        obv = np.zeros(len(data))
         
-        logger.debug(
-            f"Calcolate metriche volume, ultimi valori: "
-            f"Volume={volume[-1]:.0f}, MA={volume_ma[-1]:.0f}, "
-            f"Ratio={volume_ratio[-1]:.2f}"
-        )
+        for i in range(1, len(data)):
+            if close_diff.iloc[i] > 0:
+                obv[i] = obv[i-1] + data['volume'].iloc[i]
+            elif close_diff.iloc[i] < 0:
+                obv[i] = obv[i-1] - data['volume'].iloc[i]
+            else:
+                obv[i] = obv[i-1]
+                
+        logger.debug(f"Calcolati indicatori volume, ultimi VWAP: {vwap[-5:]}")
+        return vwap, volume_ma, obv
         
-        return {
-            'volume_ma': volume_ma.values,
-            'volume_ratio': volume_ratio
-        }
+    def _calculate_price_volume_trend(self, data: pd.DataFrame) -> float:
+        """Calcola il trend prezzo-volume.
+        
+        Args:
+            data: DataFrame con dati OHLCV
+            
+        Returns:
+            float: Indicatore di trend (-1 a 1)
+        """
+        period = self.price_volume_ma_period
+        if len(data) < period:
+            return 0
+            
+        # Calcola variazioni percentuali
+        price_changes = data['close'].pct_change().iloc[-period:]
+        volume_changes = data['volume'].pct_change().iloc[-period:]
+        
+        # Calcola correlazione
+        try:
+            correlation = np.corrcoef(price_changes, volume_changes)[0,1]
+            return correlation if not np.isnan(correlation) else 0
+        except Exception:
+            return 0
         
     def generate_signal(self, data: pd.DataFrame) -> float:
         """Genera segnale di trading basato sul volume.
@@ -82,32 +111,52 @@ class VolumeGene(Gene):
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
         try:
-            metrics = self.calculate(data)
-            volume_ratio = metrics['volume_ratio'][-1]
+            vwap, volume_ma, obv = self.calculate(data)
             
-            # Calcola variazione prezzo
-            close = data['close'].values
-            price_change = close[-1] - close[-2]
-            price_change_pct = (price_change / close[-2]) * 100
+            current_price = data['close'].iloc[-1]
+            current_volume = data['volume'].iloc[-1]
             
-            if volume_ratio > self.threshold:
-                if price_change > 0:
-                    logger.info(
-                        f"Volume spike rialzista (ratio: {volume_ratio:.2f}, "
-                        f"Δ price: {price_change_pct:.2f}%), signal: 1"
-                    )
-                    return 1
-                else:
-                    logger.info(
-                        f"Volume spike ribassista (ratio: {volume_ratio:.2f}, "
-                        f"Δ price: {price_change_pct:.2f}%), signal: -1"
-                    )
-                    return -1
+            # Analisi trend prezzo-volume
+            pv_trend = self._calculate_price_volume_trend(data)
+            
+            # Volume spike analysis con divisione sicura
+            volume_ratio = safe_divide(current_volume, volume_ma[-1], default=1)
+            
+            # VWAP analysis con divisione sicura
+            vwap_ratio = safe_divide(current_price, vwap[-1], default=1)
+            
+            # OBV trend
+            obv_trend = safe_divide(obv[-1] - obv[-2], abs(obv[-2]), default=0)
+            
+            # Segnali di trading
+            if volume_ratio > 2.0:  # Volume spike significativo
+                if current_price > vwap[-1] and pv_trend > 0:  # Conferma rialzista
+                    confidence = min(volume_ratio/4 + abs(pv_trend), 1.0)
+                    signal = 1 if confidence > self.signal_threshold else 0
+                    logger.info(f"Volume spike rialzista, confidence: {confidence:.2f}, signal: {signal}")
+                    return signal
                     
-            logger.debug(
-                f"Volume nella norma (ratio: {volume_ratio:.2f}, "
-                f"Δ price: {price_change_pct:.2f}%)"
-            )
+                elif current_price < vwap[-1] and pv_trend < 0:  # Conferma ribassista
+                    confidence = min(volume_ratio/4 + abs(pv_trend), 1.0)
+                    signal = -1 if confidence > self.signal_threshold else 0
+                    logger.info(f"Volume spike ribassista, confidence: {confidence:.2f}, signal: {signal}")
+                    return signal
+                    
+            # Segnali di momentum basati su OBV
+            elif abs(obv_trend) > 0.02:  # Movimento significativo OBV
+                if obv_trend > 0 and vwap_ratio > 1:
+                    confidence = min(abs(obv_trend) * 20, 1.0)
+                    if confidence > self.signal_threshold:
+                        logger.info(f"OBV momentum rialzista, confidence: {confidence:.2f}")
+                        return 0.5
+                        
+                elif obv_trend < 0 and vwap_ratio < 1:
+                    confidence = min(abs(obv_trend) * 20, 1.0)
+                    if confidence > self.signal_threshold:
+                        logger.info(f"OBV momentum ribassista, confidence: {confidence:.2f}")
+                        return -0.5
+            
+            logger.debug(f"Volume neutrale, ratio: {volume_ratio:.2f}, PV trend: {pv_trend:.2f}")
             return 0
             
         except Exception as e:

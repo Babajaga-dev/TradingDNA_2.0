@@ -6,7 +6,7 @@ import sys
 import argparse
 import logging
 
-from utils.logger import setup_logging
+from utils.logger_base import setup_logging
 from cli.menu import handle_menu
 from cli.commands import (
     handle_init, handle_dna, handle_immune, handle_metabolism, 

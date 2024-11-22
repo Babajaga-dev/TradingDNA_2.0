@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Dict
 import numpy as np
 
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Setup logger
 logger = get_component_logger('Metrics.Gene')

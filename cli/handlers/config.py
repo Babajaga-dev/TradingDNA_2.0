@@ -7,7 +7,7 @@ from pathlib import Path
 from rich.table import Table
 
 from cli.utils import show_progress, console, print_error, print_success
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 from utils.config import load_config, validate_config
 
 # Setup logger

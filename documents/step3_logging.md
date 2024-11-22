@@ -10,7 +10,7 @@
 
 ### 1. Utilizzo Base
 ```python
-from utils.logger import setup_logging, get_logger
+from utils.logger_base import setup_logging, get_logger
 
 # Inizializza il sistema di logging
 setup_logging()
@@ -24,7 +24,7 @@ logger.error("Errore critico")
 
 ### 2. Component Logger
 ```python
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Ottieni logger per componenti specifici
 dna_logger = get_component_logger("dna")
@@ -37,7 +37,7 @@ immune_logger.warning("Anomalia rilevata")     # 🛡️ IMMUNE      │ Anomali
 
 ### 3. Progress Tracking
 ```python
-from utils.logger import get_progress_logger
+from utils.logger_base import get_progress_logger
 
 # Progress bar singola
 with get_progress_logger() as progress:

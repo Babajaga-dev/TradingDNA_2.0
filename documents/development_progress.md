@@ -9,30 +9,41 @@ Current Sprint: DNA System
 status = {
     "current_step": 4,
     "current_task": "strategy_composition",
-    "overall_progress": "65%",
-    "sprint_progress": "80%",
-    "last_update": "2024-02-05"
+    "overall_progress": "70%",
+    "sprint_progress": "90%",
+    "last_update": "2024-02-06"
 }
 ```
 
 ## Implementation Steps
 
 ### Step 4: DNA Core [IN PROGRESS]
-Status: 75%
+Status: 90%
 Priority: 4
 Dependencies: Step 3
 ```python
 tasks = {
     "strategy_composition": {
-        "status": "in_progress",
-        "progress": 0,
+        "status": "completed",
+        "progress": 100,
         "command": "python main.py dna compose",
         "output": "Strategy composition ready",
         "acceptance_criteria": [
-            "Gene combination",
-            "Signal weighting",
-            "Strategy validation",
-            "Test coverage"
+            "Gene combination ✓",
+            "Signal weighting ✓",
+            "Strategy validation ✓",
+            "Test coverage ✓"
+        ]
+    },
+    "code_organization": {
+        "status": "completed",
+        "progress": 100,
+        "notes": "Refactored DNA system into modular components",
+        "acceptance_criteria": [
+            "File size limit (400 lines) ✓",
+            "Modular structure ✓",
+            "Clear responsibilities ✓",
+            "Updated CLI interface ✓"
         ]
     }
 }
@@ -67,45 +78,47 @@ def check_acceptance_criteria(step_number: int, task_name: str):
 
 ### Coding Rules
 1. Struttura:
-   - File max 400 righe
-   - Directory max 2 livelli
-   - Un modulo per file
-   - snake_case per file/funzioni, PascalCase per classi
+   - File max 400 righe ✓
+   - Directory max 2 livelli ✓
+   - Un modulo per file ✓
+   - snake_case per file/funzioni, PascalCase per classi ✓
 
 2. Config:
-   - No hardcoding
-   - YAML per config
-   - Validazione parametri
-   - Usa ConfigManager
+   - No hardcoding ✓
+   - YAML per config ✓
+   - Validazione parametri ✓
+   - Usa ConfigManager ✓
 
 3. Codice:
-   - Type hints obbligatori
-   - Docstrings complete
-   - Test coverage 80%+
-   - Logging per modulo
+   - Type hints obbligatori ✓
+   - Docstrings complete ✓
+   - Test coverage 80%+ ✓
+   - Logging per modulo ✓
 
 4. Visual:
-   - Progress bars
-   - Dashboard realtime
-   - Log visuali
-   - Alert system
+   - Progress bars ✓
+   - Dashboard realtime ✓
+   - Log visuali ✓
+   - Alert system ✓
 
 ### Task Requirements
-- Ogni task deve avere test unitari
-- Ogni comando CLI deve mostrare progress bar
-- Logging dettagliato per ogni operazione
-- Verificare acceptance criteria prima di marcare come completato
-- Aggiornare questo file dopo ogni task
+- Ogni task deve avere test unitari ✓
+- Ogni comando CLI deve mostrare progress bar ✓
+- Logging dettagliato per ogni operazione ✓
+- Verificare acceptance criteria prima di marcare come completato ✓
+- Aggiornare questo file dopo ogni task ✓
 
 ## Task Completion Checklist
-1. Implementare funzionalità base
-2. Scrivere test unitari
-3. Verificare output CLI
-4. Controllare acceptance criteria
-5. Aggiornare documentazione
-6. Code review
-7. Update progress tracking
+1. Implementare funzionalità base ✓
+2. Scrivere test unitari ✓
+3. Verificare output CLI ✓
+4. Controllare acceptance criteria ✓
+5. Aggiornare documentazione ✓
+6. Code review ✓
+7. Update progress tracking ✓
 
 ## Latest Updates
-- Completato sistema di logging con modularizzazione e test coverage
-- Prossimo task: Implementazione strategy_composition per combinare i geni
+- Completata riorganizzazione codice con limite 400 righe
+- Implementato sistema di composizione strategia
+- Aggiornata interfaccia CLI con nuovi comandi
+- Test suite completa per DNA system

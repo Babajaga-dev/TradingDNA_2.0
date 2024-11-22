@@ -1,11 +1,12 @@
-"""Package DNA per il sistema di trading algoritmico.
+"""DNA System package.
 
-Questo package contiene l'implementazione del sistema DNA che include:
-- Classe base per i geni
-- Implementazioni specifiche degli indicatori
-- Pattern recognition
+Questo package contiene le componenti del sistema DNA:
+- Gene: classe base per gli indicatori
+- DNA: gestione strategie
+- Geni specifici: RSI, MACD, Bollinger, Volume
 """
-from core.dna.base import Gene, DNA
+from core.dna.gene import Gene
+from core.dna.dna import DNA
 from core.dna.rsi_gene import RSIGene
 from core.dna.macd_gene import MACDGene
 from core.dna.bollinger_gene import BollingerGene
@@ -15,7 +16,7 @@ __all__ = [
     'Gene',
     'DNA',
     'RSIGene',
-    'MACDGene', 
+    'MACDGene',
     'BollingerGene',
     'VolumeGene'
 ]

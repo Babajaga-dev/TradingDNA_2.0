@@ -3,18 +3,15 @@ Comandi CLI per TradingDNA 2.0
 """
 import time
 import sys
-from pathlib import Path
-import pandas as pd
 from rich.table import Table
 
-from cli.utils import show_progress, console, print_error, print_success
+from cli.utils import show_progress, console, print_error
 from cli.handlers.log import handle_log
 from cli.handlers.download import handle_download
 from cli.handlers.config import handle_config
-from utils.logger import get_component_logger
+from cli.handlers.dna import handle_dna_command
+from utils.logger_base import get_component_logger
 from utils.initializer import Initializer, InitializationError
-from core.dna import DNA, RSIGene, MACDGene, BollingerGene, VolumeGene
-from core.dna.pattern_recognition import PatternRecognition
 
 # Setup logger
 logger = get_component_logger('CLI')
@@ -69,12 +66,11 @@ def handle_init(args):
     logger.info("Avvio inizializzazione sistema")
     try:
         initializer = Initializer(force=args.force)
-        initializer.initialize()  # Chiamata una sola volta
+        initializer.initialize()
         
-        # Progress bar solo se l'inizializzazione ha successo
         with show_progress("Inizializzazione sistema") as progress:
             task = progress.add_task("Setup completato", total=100)
-            progress.update(task, advance=100)  # Aggiorna subito al 100%
+            progress.update(task, advance=100)
             
     except InitializationError as e:
         logger.error(f"Errore di inizializzazione: {str(e)}")
@@ -90,165 +86,4 @@ def handle_init(args):
 
 def handle_dna(args):
     """Gestisce il comando dna"""
-    logger.info(f"Esecuzione comando DNA: {args.action}")
-    
-    try:
-        dna = DNA()  # Inizializza il sistema DNA
-        
-        if args.action == "init":
-            # Inizializza DNA con tutti i geni
-            genes = [
-                PatternRecognition(),
-                RSIGene(),
-                MACDGene(),
-                BollingerGene(),
-                VolumeGene()
-            ]
-            
-            with show_progress("Inizializzazione DNA") as progress:
-                task = progress.add_task("Aggiunta geni...", total=len(genes))
-                for gene in genes:
-                    dna.add_gene(gene)
-                    progress.update(task, advance=1)
-                    time.sleep(0.1)
-                    
-            logger.info("DNA inizializzato con tutti i geni")
-            print_success("DNA inizializzato con successo")
-            
-        elif args.action == "analyze":
-            # Verifica presenza gene Pattern Recognition
-            pattern_gene = next((g for g in dna.genes.values() 
-                               if isinstance(g, PatternRecognition)), None)
-            
-            if not pattern_gene:
-                logger.warning("Pattern Recognition non presente")
-                print_error("Gene Pattern Recognition non trovato. Esegui 'dna init' prima.")
-                return
-                
-            # Carica dati
-            pair = args.pair or "BTC/USDT"
-            timeframe = args.timeframe or "1h"
-            data_path = Path(f"data/market/{pair.replace('/', '_')}_{timeframe}_training.parquet")
-            
-            if not data_path.exists():
-                logger.error(f"File dati non trovato: {data_path}")
-                print_error(f"Dati non trovati per {pair} {timeframe}")
-                return
-                
-            data = pd.read_parquet(data_path)
-            logger.info(f"Caricati {len(data)} dati per analisi pattern")
-            
-            # Analisi pattern
-            with show_progress("Analisi Pattern") as progress:
-                task = progress.add_task("[cyan]Analisi pattern...", total=len(data))
-                pattern_scores = pattern_gene.calculate(data)
-                progress.update(task, completed=len(data))
-            
-            # Mostra risultati
-            table = Table(title="Analisi Pattern", show_header=True)
-            table.add_column("Metrica", style="cyan")
-            table.add_column("Valore", style="green")
-            
-            table.add_row("Pattern Identificati", str(len(pattern_gene.patterns)))
-            table.add_row("Score Medio", f"{pattern_scores.mean():.3f}")
-            table.add_row("Score Massimo", f"{pattern_scores.max():.3f}")
-            
-            console.print("\n")
-            console.print(table)
-            logger.info(f"Analisi pattern completata: {len(pattern_gene.patterns)} pattern trovati")
-            print_success("Analisi pattern completata")
-            
-        elif args.action == "indicators":
-            if not dna.genes:
-                logger.warning("Nessun gene presente")
-                print_error("Esegui 'dna init' prima di usare gli indicatori")
-                return
-                
-            # Carica dati
-            pair = args.pair or "BTC/USDT"
-            timeframe = args.timeframe or "1h"
-            data_path = Path(f"data/market/{pair.replace('/', '_')}_{timeframe}_training.parquet")
-            
-            if not data_path.exists():
-                logger.error(f"File dati non trovato: {data_path}")
-                print_error(f"Dati non trovati per {pair} {timeframe}")
-                return
-                
-            data = pd.read_parquet(data_path)
-            logger.info(f"Caricati {len(data)} dati per analisi indicatori")
-            
-            # Calcola segnali per ogni indicatore
-            table = Table(title=f"Analisi Indicatori ({pair} {timeframe})", show_header=True)
-            table.add_column("Indicatore", style="cyan")
-            table.add_column("Ultimo Segnale", style="yellow")
-            table.add_column("Ultimo Valore", style="green")
-            
-            with show_progress("Calcolo Indicatori") as progress:
-                task = progress.add_task("Analisi...", total=len(dna.genes))
-                
-                for name, gene in dna.genes.items():
-                    if isinstance(gene, (RSIGene, MACDGene, BollingerGene, VolumeGene)):
-                        signal = gene.generate_signal(data)
-                        signal_map = {1: "🟢 BUY", 0: "⚪ HOLD", -1: "🔴 SELL"}
-                        
-                        if isinstance(gene, RSIGene):
-                            value = gene.calculate(data)[-1]
-                            table.add_row(name, signal_map[signal], f"RSI: {value:.2f}")
-                            
-                        elif isinstance(gene, MACDGene):
-                            values = gene.calculate(data)
-                            hist = values['histogram'][-1]
-                            table.add_row(name, signal_map[signal], f"Hist: {hist:.4f}")
-                            
-                        elif isinstance(gene, BollingerGene):
-                            bands = gene.calculate(data)
-                            last_close = data['close'].iloc[-1]
-                            upper = bands['upper'][-1]
-                            lower = bands['lower'][-1]
-                            b_value = (last_close - lower)/(upper - lower)
-                            table.add_row(name, signal_map[signal], f"%B: {b_value:.2f}")
-                            
-                        elif isinstance(gene, VolumeGene):
-                            metrics = gene.calculate(data)
-                            ratio = metrics['volume_ratio'][-1]
-                            table.add_row(name, signal_map[signal], f"Vol Ratio: {ratio:.2f}")
-                            
-                    progress.update(task, advance=1)
-                    time.sleep(0.1)
-            
-            console.print("\n")
-            console.print(table)
-            logger.info("Analisi indicatori completata")
-            print_success("Analisi indicatori completata")
-            
-        elif args.action == "score":
-            if not dna.genes:
-                logger.warning("Nessun gene presente per scoring")
-                print_error("Aggiungi geni al DNA prima di calcolare gli score")
-                return
-                
-            # Calcola e mostra metriche
-            table = Table(title="DNA Scoring", show_header=True)
-            table.add_column("Gene", style="cyan")
-            table.add_column("Fitness", style="green")
-            table.add_column("Win Rate", style="yellow")
-            table.add_column("Profit Factor", style="magenta")
-            
-            for name, gene in dna.genes.items():
-                metrics = gene.metrics.to_dict()
-                table.add_row(
-                    name,
-                    f"{metrics['fitness']:.2f}",
-                    f"{metrics['win_rate']:.2f}",
-                    f"{metrics['profit_factor']:.2f}"
-                )
-            
-            console.print("\n")
-            console.print(table)
-            logger.info("Scoring DNA completato")
-            print_success("Scoring completato")
-            
-    except Exception as e:
-        logger.error(f"Errore durante esecuzione comando DNA: {str(e)}")
-        print_error(f"Errore: {str(e)}")
-        sys.exit(1)
+    handle_dna_command(args)

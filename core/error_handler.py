@@ -13,7 +13,7 @@ from core.exceptions import (
     RateLimitError, ExchangeError as DNAExchangeError,
     InsufficientFundsError, InvalidSymbolError, TradingDNAError
 )
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 logger = get_component_logger("error_handler")
 

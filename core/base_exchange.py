@@ -7,7 +7,7 @@ import yaml
 import ccxt
 from dotenv import load_dotenv
 
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 from core.exceptions import ConfigurationError, AuthenticationError
 
 logger = get_component_logger("exchange")

@@ -9,7 +9,7 @@ from rich.table import Table
 from cli.utils import show_progress, console, create_progress, print_error
 from core.base_exchange import BaseExchange
 from core.dna_downloader import DNADataDownloader
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Setup logger
 logger = get_component_logger('CLI.Log')

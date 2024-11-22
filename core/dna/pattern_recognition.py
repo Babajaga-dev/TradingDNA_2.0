@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from typing import List
-from core.dna.base import BaseGene
+from core.dna.gene import BaseGene
 
 @dataclass
 class Pattern:

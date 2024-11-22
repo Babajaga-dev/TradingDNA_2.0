@@ -10,7 +10,7 @@ from cli.utils import console, create_progress, print_error, print_success
 from core.base_exchange import BaseExchange
 from core.dna_downloader import DNADataDownloader
 from core.exceptions import ConfigurationError, AuthenticationError, DNADataError
-from utils.logger import get_component_logger
+from utils.logger_base import get_component_logger
 
 # Setup logger
 logger = get_component_logger('CLI.Download')

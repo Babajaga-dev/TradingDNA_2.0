@@ -6,8 +6,8 @@ basati sull'indicatore Relative Strength Index.
 from typing import Dict
 import numpy as np
 import pandas as pd
-from utils.logger import get_component_logger
-from core.dna.base import Gene
+from utils.logger_base import get_component_logger
+from core.dna.gene import Gene
 
 # Setup logger
 logger = get_component_logger('RSIGene')

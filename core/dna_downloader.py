@@ -11,7 +11,7 @@ from rich.console import Console
 
 from core.exceptions import DNADataError
 from core.base_exchange import BaseExchange
-from utils.logger import get_component_logger, get_progress_logger
+from utils.logger_base import get_component_logger, get_progress_logger
 from utils.config import load_config, ConfigError
 
 # Logger componente DNA
