@@ -39,7 +39,7 @@ def get_dataset_config(config: dict, dataset_name: str, pair: str = None, timefr
 
 def handle_download(args):
     """Gestisce il comando download"""
-    logger.info("Avvio download dati")
+    logger.debug("Avvio download dati")
     try:
         # Carica la configurazione DNA
         with open('config/dna.yaml', 'r') as f:
@@ -48,16 +48,16 @@ def handle_download(args):
         # Crea le directory necessarie
         data_path = config['data']['base_path']
         os.makedirs(data_path, exist_ok=True)
-        logger.info(f"Directory dati creata: {data_path}")
+        logger.debug(f"Directory dati creata: {data_path}")
         
         # Inizializza l'exchange
         exchange = BaseExchange("config/network.yaml")
         downloader = DNADataDownloader(exchange)
-        logger.info("Exchange inizializzato")
+        logger.debug("Exchange inizializzato")
 
         # Determina quali dataset scaricare
         datasets = ['training', 'testing', 'paper_trading'] if args.dataset == 'all' else [args.dataset]
-        logger.info(f"Dataset da scaricare: {datasets}")
+        logger.debug(f"Dataset da scaricare: {datasets}")
         
         # Raccoglie tutte le serie da scaricare
         all_series = []
@@ -74,52 +74,81 @@ def handle_download(args):
 
         with create_progress() as progress:
             # Task per il progresso totale
-            total_task = progress.add_task("[cyan]Progresso totale", total=len(all_series))
-            operation_task = progress.add_task("[cyan]Operazione corrente", total=4, visible=False)
+            total_task = progress.add_task(
+                "[cyan]Download totale", 
+                total=len(all_series)
+            )
+            
+            # Task per le operazioni
+            operation_task = progress.add_task(
+                "[cyan]Operazione corrente",
+                total=100,  # Usiamo percentuale per operazioni
+                visible=False
+            )
 
             # Per ogni serie temporale
             for series in all_series:
                 symbol_desc = f"{series['symbol']} ({series['timeframe']}) - {series['dataset']}"
                 console.print(f"\n[cyan]Elaborazione {symbol_desc}")
-                logger.info(f"Inizio elaborazione {symbol_desc}")
+                logger.debug(f"Inizio elaborazione {symbol_desc}")
                 
                 try:
-                    # Download
-                    progress.update(operation_task, visible=True, description=f"[cyan]Download dati")
-                    progress.update(operation_task, completed=0)
+                    # Download (30% del progresso)
+                    progress.update(operation_task, 
+                                  visible=True, 
+                                  description="[cyan]Download dati",
+                                  completed=0)
+                    
                     data = downloader.download_candles(
                         symbol=series['symbol'],
                         timeframes=[series['timeframe']],
-                        num_candles=series['candles']
+                        num_candles=series['candles'],
+                        progress=progress,
+                        task_id=operation_task
                     )
-                    progress.update(operation_task, advance=1)
-                    logger.info(f"Download completato: {len(data)} candele")
+                    progress.update(operation_task, completed=30)
+                    logger.debug(f"Download completato: {len(data)} candele")
                     
-                    # Validazione
-                    progress.update(operation_task, description=f"[cyan]Validazione dati")
+                    # Validazione (20% del progresso)
+                    progress.update(operation_task, 
+                                  description="[cyan]Validazione dati",
+                                  completed=30)
+                    
                     downloader.validate_data(data)
-                    progress.update(operation_task, advance=1)
-                    logger.info("Validazione completata")
+                    progress.update(operation_task, completed=50)
+                    logger.debug("Validazione completata")
                     
-                    # Split
-                    progress.update(operation_task, description=f"[cyan]Split dataset")
+                    # Split (20% del progresso)
+                    progress.update(operation_task, 
+                                  description="[cyan]Split dataset",
+                                  completed=50)
+                    
                     training, validation, testing = downloader.split_data(data)
-                    progress.update(operation_task, advance=1)
-                    logger.info("Split dataset completato")
+                    progress.update(operation_task, completed=70)
+                    logger.debug("Split dataset completato")
                     
-                    # Salvataggio
-                    progress.update(operation_task, description=f"[cyan]Salvataggio dati")
-                    downloader.save_data(training, validation, testing, series['symbol'])
-                    progress.update(operation_task, advance=1)
-                    logger.info("Salvataggio completato")
+                    # Salvataggio (30% del progresso)
+                    progress.update(operation_task, 
+                                  description="[cyan]Salvataggio dati",
+                                  completed=70)
                     
-                    # Aggiorna progresso totale
+                    downloader.save_data(
+                        training, validation, testing, 
+                        series['symbol'],
+                        progress=progress,
+                        task_id=operation_task
+                    )
+                    progress.update(operation_task, completed=100)
+                    logger.debug("Salvataggio completato")
+                    
+                    # Aggiorna progresso totale e resetta operazione
                     progress.update(total_task, advance=1)
-                    progress.update(operation_task, visible=False)
+                    progress.update(operation_task, visible=False, completed=0)
                     
                     # Mostra info sul completamento
                     print_success(f"{symbol_desc} completato")
                     console.print(f"   Candele scaricate: {series['candles']}")
+                    logger.debug(f"{symbol_desc} completato - Candele scaricate: {series['candles']}")
                     
                 except DNADataError as e:
                     logger.error(f"Errore durante il download di {series['symbol']}: {str(e)}")

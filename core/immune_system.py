@@ -50,10 +50,47 @@ class ImmuneSystem:
         self._market_state = {
             'volatility': 0.0,
             'trend': 'neutral',
-            'risk_level': 'normal'
+            'risk_level': 'normal',
+            'avg_volume': 0.0  # Added for volume comparison
         }
         self._exchange_health = {}  # Track exchange health metrics
         logger.info("Immune System initialized with RiskManager")
+
+    def calculate_dynamic_stops(self, position: Dict, volatility: float) -> Tuple[float, float]:
+        """
+        Calculate dynamic stop loss and take profit levels based on position and market volatility.
+        
+        Args:
+            position: Current position details including entry price and price history
+            volatility: Current market volatility
+            
+        Returns:
+            Tuple of (stop_loss_price, take_profit_price)
+        """
+        entry_price = position['entry_price']
+        
+        # Base stop distance on volatility and recent price movement
+        volatility_factor = max(0.5, min(2.0, volatility * 10))  # Scale volatility to reasonable range
+        price_history = position.get('price_history', [])
+        
+        if price_history:
+            # Calculate average true range from price history
+            ranges = [abs(high - low) for high, low in zip(price_history[1:], price_history[:-1])]
+            avg_range = sum(ranges) / len(ranges) if ranges else entry_price * 0.01
+            
+            # Dynamic stop loss distance based on ATR and volatility
+            stop_distance = avg_range * volatility_factor
+            take_profit_distance = stop_distance * 1.5  # Risk:Reward ratio of 1:1.5
+        else:
+            # Fallback to simple percentage if no price history
+            stop_distance = entry_price * 0.02 * volatility_factor
+            take_profit_distance = stop_distance * 1.5
+        
+        stop_loss = entry_price - stop_distance
+        take_profit = entry_price + take_profit_distance
+        
+        logger.info(f"Calculated dynamic stops - SL: {stop_loss:.2f}, TP: {take_profit:.2f}")
+        return stop_loss, take_profit
 
     def set_protection_config(self, config: Dict[str, bool]) -> None:
         """
@@ -156,8 +193,19 @@ class ImmuneSystem:
                 logger.warning(f"Extreme price movement detected: {price_change:.2%}")
                 return True
         
-        # Check for volume anomalies
-        if market_data.get('volume', 0) > self._market_state.get('avg_volume', 0) * 3:
+        # Update and check average volume
+        current_volume = market_data.get('volume', 0)
+        if self._market_state['avg_volume'] == 0:
+            self._market_state['avg_volume'] = current_volume
+        else:
+            # Exponential moving average for volume
+            self._market_state['avg_volume'] = (
+                0.9 * self._market_state['avg_volume'] + 
+                0.1 * current_volume
+            )
+        
+        # Check for volume anomalies (now comparing against maintained average)
+        if current_volume > self._market_state['avg_volume'] * 3:
             logger.warning("Abnormal volume detected")
             return True
             
@@ -209,13 +257,13 @@ class ImmuneSystem:
     def _calculate_drawdown(self, positions: List[Dict]) -> float:
         """Calculate current drawdown across all positions."""
         total_pnl = sum(
-            pos.get('unrealized_pnl', 0) for pos in positions
+            pos.get('unrealized_pnl', 0.0) for pos in positions
         )
         total_value = sum(
             pos['size'] * pos.get('current_price', pos['entry_price'])
             for pos in positions
         )
-        return abs(min(0, total_pnl / total_value)) if total_value else 0
+        return float(abs(min(0.0, total_pnl / total_value)) if total_value else 0.0)
 
     def _assess_counterparty_risk(self, positions: List[Dict]) -> float:
         """

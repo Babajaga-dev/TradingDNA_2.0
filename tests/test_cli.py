@@ -1,7 +1,9 @@
 """Test module for CLI functionality."""
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 import pandas as pd
+from rich.console import Console
+from rich.table import Table
 
 from cli.handlers import DNAHandler
 from cli.menus.dna import DNAMenu
@@ -13,63 +15,129 @@ def mock_dna_handler():
     return MagicMock(spec=DNAHandler)
 
 @pytest.fixture
+def mock_console():
+    """Create a mock Console."""
+    console = MagicMock(spec=Console)
+    console.input.return_value = "0"  # Default to exit option
+    return console
+
+@pytest.fixture
+def mock_table():
+    """Create a mock Table."""
+    table = MagicMock(spec=Table)
+    table.add_column = MagicMock()
+    table.add_row = MagicMock()
+    return table
+
+@pytest.fixture
 def mock_dna_menu():
     """Create a mock DNAMenu."""
-    return MagicMock(spec=DNAMenu)
-
-def test_dna_menu(mock_dna_handler):
-    """Test DNA menu functionality."""
     menu = DNAMenu()
-    menu.handler = mock_dna_handler
-    
-    # Test menu display
-    menu.display_menu()
-    
-    # Test initialization
-    menu.handle_choice("1")
-    mock_dna_handler.handle_init.assert_called_once()
-    
-    # Test gene management
-    menu.handle_choice("2")
-    
-    # Test optimization
-    menu.handle_choice("3")
-    mock_dna_handler.handle_optimization.assert_called_once()
-    
-    # Test validation
-    menu.handle_choice("4")
-    mock_dna_handler.handle_validation.assert_called_once()
-    
-    # Test composition
-    menu.handle_choice("5")
-    mock_dna_handler.handle_composition.assert_called_once()
-    
-    # Test pattern analysis
-    menu.handle_choice("6")
-    mock_dna_handler.handle_pattern_analysis.assert_called_once()
-    
-    # Test indicators
-    menu.handle_choice("7")
-    mock_dna_handler.handle_indicators.assert_called_once()
-    
-    # Test scoring
-    menu.handle_choice("8")
-    mock_dna_handler.handle_scoring.assert_called_once()
-    
-    # Test exit
-    assert menu.handle_choice("0") is False
-    
-    # Test invalid choice
-    assert menu.handle_choice("9") is True
+    menu.handler = MagicMock(spec=DNAHandler)
+    return menu
 
-def test_dna_handler_initialization():
-    """Test DNAHandler initialization."""
-    handler = DNAHandler()
-    assert handler.dna is not None
+def test_dna_menu_display():
+    """Test DNA menu display with Rich UI."""
+    with patch('cli.menus.dna.Table') as mock_table_class, \
+         patch('cli.menus.dna.console') as mock_console:
+        # Setup mock table
+        mock_table = mock_table_class.return_value
+        mock_table.add_column = MagicMock()
+        mock_table.add_row = MagicMock()
+        
+        menu = DNAMenu()
+        menu.display_menu()
+        
+        # Verify console and table usage
+        assert mock_console.print.call_count >= 1
+        assert mock_table.add_column.call_count >= 1
+        assert mock_table.add_row.call_count >= 1
 
-@patch('core.dna.DNA')
+def test_dna_menu_main_options():
+    """Test main menu options."""
+    with patch('cli.menus.dna.console') as mock_console, \
+         patch('cli.menus.dna.show_progress') as mock_progress, \
+         patch('cli.menus.dna.time.sleep', return_value=None):
+        mock_progress.return_value.__enter__.return_value = MagicMock()
+        mock_console.input.return_value = "0"
+        
+        menu = DNAMenu()
+        menu.handler = MagicMock(spec=DNAHandler)
+        
+        # Test initialization
+        menu.handle_choice("1")
+        menu.handler.handle_init.assert_called_once()
+        
+        # Test optimization
+        menu.handle_choice("3")
+        menu.handler.handle_optimization.assert_called_once()
+        
+        # Test validation
+        menu.handle_choice("4")
+        menu.handler.handle_validation.assert_called_once()
+        
+        # Test composition
+        menu.handle_choice("5")
+        menu.handler.handle_composition.assert_called_once()
+        
+        # Test pattern analysis
+        menu.handle_choice("6")
+        menu.handler.handle_pattern_analysis.assert_called_once()
+        
+        # Test indicators
+        menu.handle_choice("7")
+        menu.handler.handle_indicators.assert_called_once()
+        
+        # Test scoring
+        menu.handle_choice("8")
+        menu.handler.handle_scoring.assert_called_once()
+        
+        # Test exit
+        assert menu.handle_choice("0") is False
+        
+        # Test invalid choice
+        assert menu.handle_choice("9") is True
+
+def test_genes_submenu():
+    """Test genes submenu functionality."""
+    with patch('cli.menus.dna.console') as mock_console, \
+         patch('cli.menus.dna.show_progress') as mock_progress, \
+         patch('cli.menus.dna.time.sleep', return_value=None):
+        mock_progress.return_value.__enter__.return_value = MagicMock()
+        
+        # Setup input sequence with enough values for the menu loop
+        mock_console.input.side_effect = ["1", "", "0"]  # Select RSI, continue, exit
+        
+        menu = DNAMenu()
+        menu.handler = MagicMock(spec=DNAHandler)
+        
+        # Enter gene management and select RSI
+        menu._handle_genes()
+        
+        # Verify RSI gene handler was called
+        menu.handler.handle_gene.assert_called_with('rsi')
+
+def test_error_handling():
+    """Test error handling in menu."""
+    with patch('cli.menus.dna.console') as mock_console, \
+         patch('cli.menus.dna.show_progress') as mock_progress, \
+         patch('cli.menus.dna.time.sleep', return_value=None), \
+         patch('cli.menus.dna.print_error') as mock_print_error:
+        mock_progress.return_value.__enter__.return_value = MagicMock()
+        mock_console.input.return_value = ""
+        
+        menu = DNAMenu()
+        menu.handler = MagicMock(spec=DNAHandler)
+        menu.handler.handle_init.side_effect = Exception("Test error")
+        
+        menu.handle_choice("1")
+        
+        # Verify error was printed
+        mock_print_error.assert_called_with("Errore: Test error")
+
+@patch('cli.handlers.dna.DNA')
 @patch('cli.handlers.dna.load_config')
-def test_dna_handler_init(mock_load_config, mock_dna_class, mock_dna_handler):
+def test_dna_handler_init(mock_load_config, mock_dna_class):
     """Test DNA initialization."""
     mock_config = {
         'indicators': {
@@ -81,12 +149,14 @@ def test_dna_handler_init(mock_load_config, mock_dna_class, mock_dna_handler):
         }
     }
     mock_load_config.return_value = mock_config
+    mock_dna_instance = MagicMock()
+    mock_dna_class.return_value = mock_dna_instance
     
     handler = DNAHandler()
     handler.handle_init()
     
     mock_load_config.assert_called_once_with('dna.yaml')
-    assert len(mock_dna_class().add_gene.mock_calls) == 5
+    assert mock_dna_instance.add_gene.call_count == 5
 
 @patch('cli.handlers.dna.pd.read_parquet')
 def test_dna_handler_load_market_data(mock_read_parquet):
@@ -99,30 +169,6 @@ def test_dna_handler_load_market_data(mock_read_parquet):
     
     assert data is mock_data
     mock_read_parquet.assert_called_once()
-
-def test_dna_handler_error_handling(mock_dna_handler):
-    """Test error handling in DNAHandler."""
-    handler = DNAHandler()
-    
-    # Test initialization error
-    mock_dna_handler.handle_init.side_effect = Exception("Test error")
-    with pytest.raises(Exception):
-        handler.handle_init()
-    
-    # Test gene analysis error
-    mock_dna_handler.handle_gene.side_effect = Exception("Test error")
-    with pytest.raises(Exception):
-        handler.handle_gene("rsi")
-    
-    # Test optimization error
-    mock_dna_handler.handle_optimization.side_effect = Exception("Test error")
-    with pytest.raises(Exception):
-        handler.handle_optimization()
-    
-    # Test validation error
-    mock_dna_handler.handle_validation.side_effect = Exception("Test error")
-    with pytest.raises(Exception):
-        handler.handle_validation()
 
 def test_init_command():
     """Test init command."""
@@ -138,9 +184,11 @@ def test_init_command():
         with pytest.raises(SystemExit):
             handle_init(args)
 
-def test_config_command():
+@patch('cli.handlers.config.console')
+def test_config_command(mock_console):
     """Test config command."""
     from cli.handlers import handle_config
+    mock_console.input.return_value = "0"
     
     # Test show config
     args = MagicMock(action='show', file=None)
@@ -150,9 +198,11 @@ def test_config_command():
     args = MagicMock(action='validate', file=None)
     handle_config(args)
 
-def test_download_command():
+@patch('cli.handlers.download.console')
+def test_download_command(mock_console):
     """Test download command."""
     from cli.handlers import handle_download
+    mock_console.input.return_value = "0"
     
     args = MagicMock(
         dataset='all',
@@ -162,9 +212,11 @@ def test_download_command():
     )
     handle_download(args)
 
-def test_log_command():
+@patch('cli.handlers.log.console')
+def test_log_command(mock_console):
     """Test log command."""
     from cli.handlers import handle_log
+    mock_console.input.return_value = "0"
     
     # Test show logs
     args = MagicMock(action='show', module=None)

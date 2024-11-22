@@ -65,13 +65,12 @@ class PositionProtection:
         Returns:
             Tuple of (stop_loss, warning_level)
         """
-        # Base stop distance on volatility
-        stop_distance = min(
-            volatility * self._config['volatility_multiplier'],
-            self._config['max_stop_distance']
-        )
+        # Base stop distance adjusted by volatility
+        base_distance = self._config['max_stop_distance']
+        volatility_factor = 1 + (volatility * self._config['volatility_multiplier'])
+        stop_distance = base_distance * volatility_factor
         
-        # Calculate stop levels
+        # Calculate stop levels from current price
         stop_loss = current_price * (1 - stop_distance)
         warning_level = current_price * (1 - stop_distance * 0.7)
         
@@ -99,25 +98,27 @@ class PositionProtection:
         Returns:
             Tuple of (take_profit, trailing_activation)
         """
-        # Calculate base risk (distance to stop)
-        risk = entry_price - stop_loss
+        # Calculate base risk percentage
+        risk_percent = abs(entry_price - stop_loss) / entry_price
         
-        # Adjust profit multiplier based on market trend
+        # Adjust multipliers based on market trend
         trend_adjustment = max(0.8, min(1.2, 1 + market_trend))
-        profit_multiplier = self._config['profit_take_multiplier'] * trend_adjustment
         
-        # Calculate take profit level
-        take_profit = entry_price + (risk * profit_multiplier)
+        # Calculate base target percentages from min_profit_target
+        base_take_profit = self._config['min_profit_target']
+        base_trailing = self._config['min_profit_target'] * 0.75
         
-        # Calculate trailing stop activation level
-        trailing_activation = entry_price + (
-            risk * self._config['trailing_stop_activation']
-        )
+        # Add risk-based component
+        take_profit_percent = (base_take_profit + risk_percent) * self._config['profit_take_multiplier'] * trend_adjustment
+        trailing_percent = (base_trailing + risk_percent * 0.5) * self._config['trailing_stop_activation'] * trend_adjustment
         
-        # Ensure minimum profit target
-        min_take_profit = entry_price * (1 + self._config['min_profit_target'])
-        take_profit = max(take_profit, min_take_profit)
-        trailing_activation = min(trailing_activation, take_profit * 0.9)
+        # Calculate absolute levels
+        take_profit = entry_price * (1 + take_profit_percent)
+        trailing_activation = entry_price * (1 + trailing_percent)
+        
+        # Ensure trailing stop is below take profit but above entry
+        trailing_activation = min(take_profit * 0.9, trailing_activation)
+        trailing_activation = max(trailing_activation, entry_price * 1.005)  # At least 0.5% above entry
         
         return take_profit, trailing_activation
 
@@ -228,10 +229,13 @@ class PositionProtection:
         volatility = market_data.get('volatility', 0)
         market_trend = market_data.get('trend', 0)
         
+        # With minimal data, use entry price as reference
+        reference_price = entry_price if len(market_data) <= 1 else current_price
+        
         # Calculate base protection levels
         stop_loss, warning_level = self.calculate_dynamic_stops(
             entry_price,
-            current_price,
+            reference_price,
             volatility
         )
         

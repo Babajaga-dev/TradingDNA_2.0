@@ -40,6 +40,13 @@ class MockGene(Gene):
             return 1   # Buy
         return 0      # Hold
 
+@pytest.fixture(autouse=True)
+def reset_dna():
+    """Reset del DNA prima di ogni test."""
+    DNA.reset()
+    yield
+    DNA.reset()
+
 @pytest.fixture
 def sample_data() -> pd.DataFrame:
     """Carica dati di test da file parquet."""

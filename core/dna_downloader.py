@@ -8,10 +8,11 @@ from dataclasses import dataclass
 import pandas as pd
 from rich.table import Table
 from rich.console import Console
+from rich.progress import Progress, TaskID
 
 from core.exceptions import DNADataError
 from core.base_exchange import BaseExchange
-from utils.logger_base import get_component_logger, get_progress_logger
+from utils.logger_base import get_component_logger
 from utils.config import load_config, ConfigError
 
 # Logger componente DNA
@@ -57,7 +58,9 @@ class DNADataDownloader:
         self, 
         symbol: str,
         timeframes: List[str],
-        num_candles: int
+        num_candles: int,
+        progress: Optional[Progress] = None,
+        task_id: Optional[TaskID] = None
     ) -> Dict[str, pd.DataFrame]:
         """Scarica le candele per i timeframe specificati.
         
@@ -65,6 +68,8 @@ class DNADataDownloader:
             symbol: Simbolo trading (es. BTC/USDT)
             timeframes: Lista di timeframe (es. ["1h", "4h", "1d"])
             num_candles: Numero totale di candele da scaricare
+            progress: Oggetto Progress opzionale per aggiornare la barra
+            task_id: ID del task per l'aggiornamento del progresso
             
         Returns:
             Dict con chiave timeframe e valore DataFrame delle candele
@@ -73,37 +78,29 @@ class DNADataDownloader:
             DNADataError: Se il download fallisce
         """
         results = {}
-        
-        # Inizializza progress logger
-        with get_progress_logger() as progress:
-            task_id = progress.add_task(
-                f"[bold blue]Download {symbol}",
-                total=len(timeframes)
-            )
             
-            for tf in timeframes:
-                try:
-                    logger.info(f"Download {num_candles} candele {symbol} {tf}")
-                    candles = self.exchange.fetch_ohlcv(
-                        symbol=symbol,
-                        timeframe=tf,
-                        limit=num_candles
-                    )
-                    
-                    df = pd.DataFrame(
-                        candles,
-                        columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
-                    )
-                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-                    df.set_index('timestamp', inplace=True)
-                    
-                    results[tf] = df
-                    progress.update(task_id, advance=1)
-                    logger.info(f"Completato download {symbol} {tf}")
-                    
-                except Exception as e:
-                    logger.error(f"Errore download {symbol} {tf}: {str(e)}")
-                    raise DNADataError(f"Errore download {symbol} {tf}: {str(e)}")
+        for tf in timeframes:
+            try:
+                logger.debug(f"Download {num_candles} candele {symbol} {tf}")
+                candles = self.exchange.fetch_ohlcv(
+                    symbol=symbol,
+                    timeframe=tf,
+                    limit=num_candles
+                )
+                
+                df = pd.DataFrame(
+                    candles,
+                    columns=['timestamp', 'open', 'high', 'low', 'close', 'volume']
+                )
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                df.set_index('timestamp', inplace=True)
+                
+                results[tf] = df
+                logger.debug(f"Completato download {symbol} {tf}")
+                
+            except Exception as e:
+                logger.error(f"Errore download {symbol} {tf}: {str(e)}")
+                raise DNADataError(f"Errore download {symbol} {tf}: {str(e)}")
                     
         return results
     
@@ -116,7 +113,7 @@ class DNADataDownloader:
         Raises:
             DNADataError: Se la validazione fallisce
         """
-        logger.info("Inizio validazione dati")
+        logger.debug("Inizio validazione dati")
         
         for tf, df in data.items():
             try:
@@ -134,7 +131,7 @@ class DNADataDownloader:
                 if not df.index.is_monotonic_increasing:
                     raise DNADataError(f"Timestamp non ordinati in {tf}")
                     
-                logger.info(f"Validazione dati {tf} completata")
+                logger.debug(f"Validazione dati {tf} completata")
                 
             except Exception as e:
                 logger.error(f"Errore validazione {tf}: {str(e)}")
@@ -152,7 +149,7 @@ class DNADataDownloader:
         Returns:
             Tuple di (training_data, validation_data, testing_data)
         """
-        logger.info("Inizio split dei dati")
+        logger.debug("Inizio split dei dati")
         
         training = {}
         validation = {}
@@ -170,7 +167,7 @@ class DNADataDownloader:
             validation[tf] = df.iloc[train_idx:val_idx]
             testing[tf] = df.iloc[val_idx:]
             
-            logger.info(
+            logger.debug(
                 f"Split {tf}: "
                 f"training={len(training[tf])} "
                 f"validation={len(validation[tf])} "
@@ -184,7 +181,9 @@ class DNADataDownloader:
         training: Dict[str, pd.DataFrame],
         validation: Dict[str, pd.DataFrame],
         testing: Dict[str, pd.DataFrame],
-        symbol: str
+        symbol: str,
+        progress: Optional[Progress] = None,
+        task_id: Optional[TaskID] = None
     ) -> None:
         """Salva i dataset su file.
         
@@ -193,8 +192,10 @@ class DNADataDownloader:
             validation: Dict validation data 
             testing: Dict testing data
             symbol: Simbolo trading
+            progress: Oggetto Progress opzionale per aggiornare la barra
+            task_id: ID del task per l'aggiornamento del progresso
         """
-        logger.info("Inizio salvataggio dati")
+        logger.debug("Inizio salvataggio dati")
         
         base_path = self.config["data"]["base_path"]
         symbol_safe = symbol.replace("/", "_")
@@ -205,25 +206,16 @@ class DNADataDownloader:
             "testing": testing
         }
         
-        # Inizializza progress logger
-        with get_progress_logger() as progress:
-            total_files = len(datasets) * sum(len(d) for d in datasets.values())
-            task_id = progress.add_task(
-                "[bold blue]Salvataggio dati",
-                total=total_files
-            )
-            
-            for name, data in datasets.items():
-                for tf, df in data.items():
-                    try:
-                        filename = f"{base_path}/{symbol_safe}_{tf}_{name}.parquet"
-                        df.to_parquet(filename)
-                        logger.info(f"Salvato {name} dataset per {symbol} {tf}")
-                        progress.update(task_id, advance=1)
+        for name, data in datasets.items():
+            for tf, df in data.items():
+                try:
+                    filename = f"{base_path}/{symbol_safe}_{tf}_{name}.parquet"
+                    df.to_parquet(filename)
+                    logger.debug(f"Salvato {name} dataset per {symbol} {tf}")
                         
-                    except Exception as e:
-                        logger.error(f"Errore salvataggio {name} {tf}: {str(e)}")
-                        raise DNADataError(f"Errore salvataggio {name} {tf}: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Errore salvataggio {name} {tf}: {str(e)}")
+                    raise DNADataError(f"Errore salvataggio {name} {tf}: {str(e)}")
 
     def display_data(self, symbol: str, timeframe: str, dataset_type: str = None) -> None:
         """Visualizza i dati scaricati per un simbolo e timeframe specifico.

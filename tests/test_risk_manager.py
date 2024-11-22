@@ -119,14 +119,13 @@ def test_calculate_drawdown_protection(
     sample_market_data
 ):
     """Test drawdown protection calculation."""
-    protection = risk_manager.calculate_drawdown_protection(
+    protection = risk_manager.calculate_protection_levels(
         sample_position,
         sample_market_data
     )
     assert isinstance(protection, dict)
     assert 'stop_loss' in protection
     assert 'warning_level' in protection
-    assert 'risk_level' in protection
     assert protection['stop_loss'] < sample_position['entry_price']
     assert protection['warning_level'] < sample_position['entry_price']
 

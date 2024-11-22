@@ -54,7 +54,11 @@ class RiskManager:
             'profit_take_multiplier': 1.5,  # Take profit at 1.5x stop distance
             'trailing_stop_activation': 0.5,  # Activate trailing stop at 50% of take profit
             'position_scale_threshold': 0.3,  # Scale position at 30% profit
-            'market_trend_threshold': 0.1  # Market trend significance threshold
+            'market_trend_threshold': 0.1,  # Market trend significance threshold
+            'min_profit_target': 0.02,  # 2% minimum profit target
+            'max_stop_distance': 0.05,  # 5% maximum stop distance
+            'scale_out_steps': 3,  # Number of scale out levels
+            'scale_ratio': 0.25  # Ratio to scale at each level
         }
         self._protection = ProtectionConfig()
         self._position_protection = PositionProtection(self._config)

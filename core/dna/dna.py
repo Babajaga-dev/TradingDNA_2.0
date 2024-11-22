@@ -29,14 +29,17 @@ class DNA:
         """Implementa il pattern singleton."""
         if cls._instance is None:
             cls._instance = super(DNA, cls).__new__(cls)
+            cls._instance._initialize()
         return cls._instance
         
     def __init__(self):
         """Inizializza il DNA system."""
         # Skip se già inizializzato
-        if DNA._initialized:
-            return
+        if not hasattr(self, 'genes'):
+            self._initialize()
             
+    def _initialize(self):
+        """Inizializza lo stato interno."""
         self.genes: Dict[str, Gene] = {}
         self.config = load_config('dna.yaml')
         self.strategy_metrics = StrategyMetrics()
@@ -49,8 +52,19 @@ class DNA:
         if self._state_file.exists():
             self.load_state()
         
-        DNA._initialized = True
         logger.info("Inizializzazione DNA system")
+
+    @classmethod
+    def reset(cls) -> None:
+        """Resetta lo stato del singleton per i test."""
+        cls._instance = None
+        cls._initialized = False
+        if cls._state_file.exists():
+            try:
+                cls._state_file.unlink()
+            except Exception as e:
+                logger.error(f"Errore nella rimozione del file di stato: {str(e)}")
+        logger.info("Reset stato DNA completato")
         
     @classmethod
     def get_instance(cls) -> 'DNA':

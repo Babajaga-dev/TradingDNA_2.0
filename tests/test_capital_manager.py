@@ -73,10 +73,14 @@ def test_allocation_summary():
     """Test allocation summary functionality."""
     manager = CapitalManager(Decimal('10000'), 0.02)
     
-    manager.allocate_capital('strategy1', Decimal('3000'))
-    manager.set_risk_budget('strategy1', 0.01)
-    manager.allocate_capital('strategy2', Decimal('4000'))
-    manager.set_risk_budget('strategy2', 0.015)
+    # Allocate and set risk for first strategy
+    assert manager.allocate_capital('strategy1', Decimal('3000'))
+    assert manager.set_risk_budget('strategy1', 0.01)
+    
+    # Allocate and set risk for second strategy
+    assert manager.allocate_capital('strategy2', Decimal('4000'))
+    # Set a risk budget that doesn't exceed the total limit (0.02 - 0.01 = 0.01 available)
+    assert manager.set_risk_budget('strategy2', 0.009)
     
     summary = manager.get_allocation_summary()
     
@@ -84,7 +88,7 @@ def test_allocation_summary():
     assert summary['strategy1']['capital'] == Decimal('3000')
     assert summary['strategy1']['risk_budget'] == 0.01
     assert summary['strategy2']['capital'] == Decimal('4000')
-    assert summary['strategy2']['risk_budget'] == 0.015
+    assert summary['strategy2']['risk_budget'] == 0.009
 
 def test_risk_limit_enforcement():
     """Test risk limit enforcement."""

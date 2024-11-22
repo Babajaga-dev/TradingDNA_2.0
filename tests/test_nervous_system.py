@@ -163,7 +163,7 @@ def test_error_handling(nervous_system):
     """Test error handling in various scenarios."""
     # Test initialization error
     with pytest.raises(NervousSystemError):
-        nervous_system._initialize_components = lambda: exec('raise Exception("Test error")')
+        nervous_system._initialize_components = lambda: exec('raise NervousSystemError("Test error")')
         nervous_system.__init__()
 
 def test_preprocessing(nervous_system, market_data):

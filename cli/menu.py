@@ -9,6 +9,9 @@ from cli.menus.dna import DNAMenu
 from cli.menus.immune import ImmuneMenu
 from cli.menus.metabolism import MetabolismMenu
 from cli.menus.nervous import NervousMenu
+from cli.handlers.config import handle_config
+from cli.handlers.download import handle_download
+from cli.handlers.log import handle_log
 from utils.logger_base import get_logger
 
 logger = get_logger(__name__)
@@ -66,7 +69,9 @@ class MainMenu:
             "4. [magenta]Sistema Nervoso[/magenta]\n"
             "5. [red]Sistema Endocrino[/red] [dim](In Sviluppo)[/dim]\n"
             "6. [purple]Sistema Riproduttivo[/purple] [dim](In Sviluppo)[/dim]\n"
-            "7. [cyan]Gestione Sistema[/cyan] [dim](In Sviluppo)[/dim]\n"
+            "7. [cyan]Configurazione[/cyan]\n"
+            "8. [cyan]Download Dati[/cyan]\n"
+            "9. [cyan]Log e Monitor[/cyan]\n"
             "0. [white]Esci[/white]\n\n"
             "Seleziona un'opzione:"
         )
@@ -93,9 +98,17 @@ class MainMenu:
                 self._handle_submenu(self.metabolism_menu)
             elif choice == "4":
                 self._handle_submenu(self.nervous_menu)
-            elif choice in ["5", "6", "7"]:
+            elif choice in ["5", "6"]:
                 console.print("\n[yellow]⚠ Funzionalità in sviluppo[/yellow]")
                 input("\nPremi INVIO per continuare...")
+            elif choice == "7":
+                handle_config(type('Args', (), {'action': 'show'})())
+                input("\nPremi INVIO per continuare...")
+            elif choice == "8":
+                handle_download(type('Args', (), {'dataset': 'all', 'pair': None, 'timeframe': None})())
+                input("\nPremi INVIO per continuare...")
+            elif choice == "9":
+                handle_log()
             elif choice == "0":
                 console.print("\n[yellow]Arrivederci![/yellow]")
                 return False
