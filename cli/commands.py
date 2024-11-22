@@ -9,7 +9,7 @@ from cli.utils import show_progress, console, print_error
 from cli.handlers.log import handle_log
 from cli.handlers.download import handle_download
 from cli.handlers.config import handle_config
-from cli.handlers.dna import handle_dna_command
+from cli.handlers.dna import handle_dna
 from utils.logger_base import get_component_logger
 from utils.initializer import Initializer, InitializationError
 
@@ -83,12 +83,3 @@ def handle_init(args):
         
     logger.info("Inizializzazione completata con successo")
     return True
-
-def handle_dna(args):
-    """Gestisce il comando dna"""
-    try:
-        handle_dna_command(args)
-    except Exception as e:
-        logger.error(f"Errore comando DNA: {str(e)}")
-        print_error(f"Errore comando DNA: {str(e)}")
-        sys.exit(1)

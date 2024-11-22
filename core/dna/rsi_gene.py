@@ -3,7 +3,7 @@
 Questo modulo implementa il gene RSI che calcola e genera segnali
 basati sull'indicatore Relative Strength Index.
 """
-from typing import Dict
+from typing import Dict, Any, Optional
 import numpy as np
 import pandas as pd
 from utils.logger_base import get_component_logger
@@ -15,13 +15,24 @@ logger = get_component_logger('RSIGene')
 class RSIGene(Gene):
     """Gene per il calcolo del Relative Strength Index."""
     
-    def __init__(self) -> None:
-        """Inizializza il gene RSI."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Inizializza il gene RSI.
+        
+        Args:
+            config: Dizionario con parametri di configurazione
+        """
         super().__init__("rsi")
-        self.period: int = self.params.get('period', 14)
-        self.overbought: float = self.params.get('overbought', 70)
-        self.oversold: float = self.params.get('oversold', 30)
-        self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
+        
+        # Carica configurazione con valori di default
+        if config is None:
+            config = {}
+            
+        self.period: int = config.get('period', 14)
+        self.overbought: float = config.get('overbought', 70)
+        self.oversold: float = config.get('oversold', 30)
+        self.signal_threshold: float = config.get('signal_threshold', 0.6)
+        self.weight: float = config.get('weight', 1.0)
+        
         logger.info(f"Inizializzato RSI con periodo {self.period}")
         
     def calculate(self, data: pd.DataFrame) -> np.ndarray:
@@ -108,13 +119,13 @@ class RSIGene(Gene):
                 confidence = (self.oversold - current_rsi)/(self.oversold)
                 signal = 1 if confidence > self.signal_threshold else 0
                 logger.info(f"RSI oversold ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")
-                return signal
+                return signal * self.weight
                 
             elif current_rsi > self.overbought:
                 confidence = (current_rsi - self.overbought)/(100 - self.overbought)
                 signal = -1 if confidence > self.signal_threshold else 0
                 logger.info(f"RSI overbought ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")
-                return signal
+                return signal * self.weight
                 
             logger.debug(f"RSI neutrale ({current_rsi:.2f}), nessun segnale")
             return 0

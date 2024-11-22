@@ -3,7 +3,7 @@
 Questo modulo implementa il gene MACD che calcola e genera segnali
 basati sull'indicatore MACD.
 """
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any, Optional
 import numpy as np
 import pandas as pd
 from utils.logger_base import get_component_logger
@@ -15,13 +15,24 @@ logger = get_component_logger('MACDGene')
 class MACDGene(Gene):
     """Gene per il calcolo del MACD."""
     
-    def __init__(self) -> None:
-        """Inizializza il gene MACD."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Inizializza il gene MACD.
+        
+        Args:
+            config: Dizionario con parametri di configurazione
+        """
         super().__init__("macd")
-        self.fast_period: int = self.params.get('fast_period', 12)
-        self.slow_period: int = self.params.get('slow_period', 26)
-        self.signal_period: int = self.params.get('signal_period', 9)
-        self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
+        
+        # Carica configurazione con valori di default
+        if config is None:
+            config = {}
+            
+        self.fast_period: int = config.get('fast_period', 12)
+        self.slow_period: int = config.get('slow_period', 26)
+        self.signal_period: int = config.get('signal_period', 9)
+        self.signal_threshold: float = config.get('signal_threshold', 0.3)  # Ridotta da 0.6 a 0.3
+        self.weight: float = config.get('weight', 1.0)
+        
         logger.info(f"Inizializzato MACD con periodi {self.fast_period}/{self.slow_period}/{self.signal_period}")
         
     def _ema(self, data: np.ndarray, period: int, start_index: int = 0) -> np.ndarray:
@@ -115,14 +126,14 @@ class MACDGene(Gene):
         # Calcola le differenze consecutive
         diffs = np.diff(valid_values)
         
-        # Calcola la media delle differenze
-        avg_diff = np.mean(diffs)
+        # Calcola la media delle differenze normalizzata
+        avg_diff = np.mean(diffs) / np.std(valid_values) if np.std(valid_values) > 0 else 0
         
         # Calcola la consistenza del trend (quante differenze hanno lo stesso segno)
         consistency = np.sum(np.sign(diffs) == np.sign(avg_diff)) / len(diffs)
         
         # Combina la media delle differenze con la consistenza
-        strength = avg_diff * consistency
+        strength = avg_diff * consistency * 2  # Aumentato il peso del trend
         
         return strength
         
@@ -137,7 +148,7 @@ class MACDGene(Gene):
         """
         try:
             min_periods = max(self.fast_period, self.slow_period, self.signal_period)
-            if len(data) < min_periods + 10:  # +10 per l'analisi del trend
+            if len(data) < min_periods + 5:  # Ridotto da 10 a 5 per l'analisi del trend
                 logger.warning(f"Dati insufficienti per generare segnale MACD")
                 return 0
                 
@@ -145,15 +156,15 @@ class MACDGene(Gene):
             
             # Verifica che ci siano abbastanza dati validi
             valid_data = ~np.isnan(macd_line) & ~np.isnan(signal_line) & ~np.isnan(histogram)
-            if np.sum(valid_data) < 10:
+            if np.sum(valid_data) < 5:  # Ridotto da 10 a 5
                 logger.warning("Dati validi insufficienti per l'analisi del trend")
                 return 0
                 
-            # Prendi gli ultimi 10 valori validi
-            last_macd = macd_line[valid_data][-10:]
-            last_signal = signal_line[valid_data][-10:]
-            last_hist = histogram[valid_data][-10:]
-            last_prices = data['close'].values[valid_data][-10:]
+            # Prendi gli ultimi 5 valori validi
+            last_macd = macd_line[valid_data][-5:]  # Ridotto da 10 a 5
+            last_signal = signal_line[valid_data][-5:]
+            last_hist = histogram[valid_data][-5:]
+            last_prices = data['close'].values[valid_data][-5:]
             
             # Calcola la forza dei trend
             macd_strength = self._calculate_trend_strength(last_macd)
@@ -165,22 +176,22 @@ class MACDGene(Gene):
             logger.debug(f"Price strength: {price_strength:.4f}")
             logger.debug(f"Histogram strength: {hist_strength:.4f}")
             
-            # Calcola la forza complessiva del trend
-            total_strength = (macd_strength + price_strength + hist_strength) / 3
+            # Calcola la forza complessiva del trend dando più peso al MACD
+            total_strength = (macd_strength * 1.5 + price_strength + hist_strength) / 3
             
             # Verifica trend rialzista
             if (total_strength > 0 and 
                 last_macd[-1] > last_signal[-1] and
-                last_hist[-1] > 0):
+                abs(total_strength) > self.signal_threshold):
                 logger.info(f"Trend rialzista rilevato, strength: {total_strength:.4f}")
-                return 1
+                return 1 * self.weight
                 
             # Verifica trend ribassista
             elif (total_strength < 0 and 
                   last_macd[-1] < last_signal[-1] and
-                  last_hist[-1] < 0):
+                  abs(total_strength) > self.signal_threshold):
                 logger.info(f"Trend ribassista rilevato, strength: {total_strength:.4f}")
-                return -1
+                return -1 * self.weight
             
             logger.debug(f"Nessun trend significativo rilevato, strength: {total_strength:.4f}")
             return 0

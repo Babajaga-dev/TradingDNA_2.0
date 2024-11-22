@@ -52,7 +52,7 @@ class TestMACDGene(unittest.TestCase):
         self.assertEqual(self.gene.fast_period, 12)
         self.assertEqual(self.gene.slow_period, 26)
         self.assertEqual(self.gene.signal_period, 9)
-        self.assertEqual(self.gene.signal_threshold, 0.6)
+        self.assertEqual(self.gene.signal_threshold, 0.3)  # Aggiornato al nuovo valore predefinito
         
     def test_calculate_basic(self) -> None:
         """Verifica calcolo base MACD."""

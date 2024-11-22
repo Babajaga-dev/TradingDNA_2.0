@@ -3,7 +3,10 @@
 Questo modulo contiene la classe DNA per la gestione delle strategie di trading.
 """
 import time
-from typing import Dict, List, Union
+import json
+import pickle
+from pathlib import Path
+from typing import Dict, List, Union, Optional
 import numpy as np
 import pandas as pd
 
@@ -18,14 +21,79 @@ logger = get_component_logger('DNA')
 class DNA:
     """Gestisce la struttura delle strategie di trading."""
     
+    _instance: Optional['DNA'] = None
+    _initialized: bool = False
+    _state_file = Path("data/dna_state.pkl")
+    
+    def __new__(cls) -> 'DNA':
+        """Implementa il pattern singleton."""
+        if cls._instance is None:
+            cls._instance = super(DNA, cls).__new__(cls)
+        return cls._instance
+        
     def __init__(self):
         """Inizializza il DNA system."""
+        # Skip se già inizializzato
+        if DNA._initialized:
+            return
+            
         self.genes: Dict[str, Gene] = {}
         self.config = load_config('dna.yaml')
         self.strategy_metrics = StrategyMetrics()
         self.performance_metrics = PerformanceMetrics()
         
+        # Crea directory se non esiste
+        self._state_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Carica stato se esiste
+        if self._state_file.exists():
+            self.load_state()
+        
+        DNA._initialized = True
         logger.info("Inizializzazione DNA system")
+        
+    @classmethod
+    def get_instance(cls) -> 'DNA':
+        """Restituisce l'istanza singleton del DNA.
+        
+        Returns:
+            DNA: Istanza singleton
+        """
+        if cls._instance is None:
+            cls._instance = DNA()
+        return cls._instance
+        
+    def save_state(self) -> None:
+        """Salva lo stato corrente del DNA."""
+        try:
+            state = {
+                'genes': self.genes,
+                'strategy_metrics': self.strategy_metrics,
+                'performance_metrics': self.performance_metrics
+            }
+            
+            with open(self._state_file, 'wb') as f:
+                pickle.dump(state, f)
+                
+            logger.info("Stato DNA salvato con successo")
+            
+        except Exception as e:
+            logger.error(f"Errore nel salvataggio stato DNA: {str(e)}")
+            
+    def load_state(self) -> None:
+        """Carica lo stato salvato del DNA."""
+        try:
+            with open(self._state_file, 'rb') as f:
+                state = pickle.load(f)
+                
+            self.genes = state['genes']
+            self.strategy_metrics = state['strategy_metrics']
+            self.performance_metrics = state['performance_metrics']
+            
+            logger.info("Stato DNA caricato con successo")
+            
+        except Exception as e:
+            logger.error(f"Errore nel caricamento stato DNA: {str(e)}")
         
     def add_gene(self, gene: Union[Gene, object]) -> None:
         """Aggiunge un gene al DNA.
@@ -52,6 +120,9 @@ class DNA:
         self.genes[getattr(gene, 'name', str(id(gene)))] = gene
         logger.info(f"Aggiunto gene {gene.name} al DNA")
         
+        # Salva stato dopo aggiunta gene
+        self.save_state()
+            
     def remove_gene(self, gene_name: str) -> None:
         """Rimuove un gene dal DNA.
         
@@ -61,6 +132,9 @@ class DNA:
         if gene_name in self.genes:
             del self.genes[gene_name]
             logger.info(f"Rimosso gene {gene_name} dal DNA")
+            
+            # Salva stato dopo rimozione gene
+            self.save_state()
             
     def get_strategy_signal(self, data: pd.DataFrame) -> float:
         """Genera un segnale composito dalla strategia.
@@ -229,6 +303,9 @@ class DNA:
             self.strategy_metrics.num_trades = num_trades
             self.strategy_metrics.win_rate = win_rate
             
+            # Salva stato dopo validazione
+            self.save_state()
+            
             logger.info(f"Validazione completata: {metrics}")
             return metrics
             
@@ -272,5 +349,8 @@ class DNA:
         
         # Aggiorna metriche sistema
         self.performance_metrics.update_system_metrics()
+        
+        # Salva stato dopo ottimizzazione
+        self.save_state()
         
         logger.info(f"Ottimizzazione completata, metriche test: {test_metrics}")

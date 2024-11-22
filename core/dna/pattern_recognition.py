@@ -4,9 +4,9 @@ Questo modulo implementa il riconoscimento di pattern nei prezzi
 attraverso tecniche di normalizzazione e correlazione.
 """
 from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
 import numpy as np
 import pandas as pd
-from typing import List
 from core.dna.gene import Gene
 
 @dataclass
@@ -22,12 +22,26 @@ class Pattern:
 class PatternRecognition(Gene):
     """Gene per il riconoscimento di pattern nei prezzi."""
     
-    def __init__(self) -> None:
-        """Inizializza il gene di pattern recognition."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Inizializza il gene di pattern recognition.
+        
+        Args:
+            config: Dizionario con parametri di configurazione
+        """
         super().__init__("pattern_recognition")
-        self.min_pattern_length = 5
-        self.max_pattern_length = 20
-        self.min_confidence = 0.7
+        
+        # Carica configurazione con valori di default
+        if config is None:
+            config = {}
+            
+        self.min_pattern_length = config.get('min_pattern_length', 5)
+        self.max_pattern_length = config.get('max_pattern_length', 20)
+        self.min_confidence = config.get('min_confidence', 0.7)
+        self.similarity_threshold = config.get('similarity_threshold', 0.8)
+        self.correlation_weight = config.get('correlation_weight', 0.4)
+        self.length_weight = config.get('length_weight', 0.2)
+        self.quality_threshold = config.get('quality_threshold', 0.6)
+        
         self.patterns: List[Pattern] = []
         
     def _normalize_prices(self, prices: np.ndarray) -> np.ndarray:
@@ -69,15 +83,13 @@ class PatternRecognition(Gene):
         length_factor = 1 - (length - self.min_pattern_length) / (
             self.max_pattern_length - self.min_pattern_length)
             
-        # Pesi per ciascun fattore
-        similarity_weight = 0.4
-        correlation_weight = 0.4
-        length_weight = 0.2
+        # Usa pesi dalla configurazione
+        similarity_weight = 1 - (self.correlation_weight + self.length_weight)
         
         # Calcola score pesato
         quality = (similarity * similarity_weight + 
-                  abs(correlation) * correlation_weight + 
-                  length_factor * length_weight)
+                  abs(correlation) * self.correlation_weight + 
+                  length_factor * self.length_weight)
                   
         return quality
         
@@ -113,18 +125,20 @@ class PatternRecognition(Gene):
                         quality = self._calculate_pattern_quality(
                             similarity, correlation, length)
                             
-                        # Memorizza il pattern
-                        self.patterns.append(Pattern(
-                            sequence=pattern,
-                            start_idx=i-length,
-                            end_idx=i,
-                            confidence=similarity,
-                            correlation=correlation,
-                            quality_score=quality
-                        ))
-                        
-                        # Aggiorna scores elemento per elemento
-                        scores[i-length:i] = np.maximum(scores[i-length:i], quality)
+                        # Verifica qualità minima
+                        if quality >= self.quality_threshold:
+                            # Memorizza il pattern
+                            self.patterns.append(Pattern(
+                                sequence=pattern,
+                                start_idx=i-length,
+                                end_idx=i,
+                                confidence=similarity,
+                                correlation=correlation,
+                                quality_score=quality
+                            ))
+                            
+                            # Aggiorna scores elemento per elemento
+                            scores[i-length:i] = np.maximum(scores[i-length:i], quality)
                         
         return scores
         

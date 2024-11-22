@@ -3,11 +3,11 @@
 Questo modulo implementa il gene Bollinger che calcola e genera segnali
 basati sulle bande di Bollinger.
 """
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import numpy as np
 import pandas as pd
 from utils.logger_base import get_component_logger
-from core.dna.gene import Gene  # Modificato l'import da base a gene
+from core.dna.gene import Gene
 
 # Setup logger
 logger = get_component_logger('BollingerGene')
@@ -15,12 +15,23 @@ logger = get_component_logger('BollingerGene')
 class BollingerGene(Gene):
     """Gene per il calcolo delle Bollinger Bands."""
     
-    def __init__(self) -> None:
-        """Inizializza il gene Bollinger."""
+    def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
+        """Inizializza il gene Bollinger.
+        
+        Args:
+            config: Dizionario con parametri di configurazione
+        """
         super().__init__("bollinger")
-        self.period: int = self.params.get('period', 20)
-        self.std_dev: float = self.params.get('num_std', 2.0)
-        self.signal_threshold: float = self.params.get('signal_threshold', 0.8)
+        
+        # Carica configurazione con valori di default
+        if config is None:
+            config = {}
+            
+        self.period: int = config.get('period', 20)
+        self.std_dev: float = config.get('num_std', 2.0)
+        self.signal_threshold: float = config.get('signal_threshold', 0.8)
+        self.weight: float = config.get('weight', 1.0)
+        
         logger.info(f"Inizializzato Bollinger con periodo {self.period} e {self.std_dev} deviazioni standard")
         
     def calculate(self, data: pd.DataFrame) -> Dict[str, np.ndarray]:
@@ -117,11 +128,11 @@ class BollingerGene(Gene):
             # Segnali di trading base
             if current_price < bands['lower'][-1]:  # Prezzo sotto Lower Band
                 logger.info(f"Bollinger oversold, prezzo: {current_price:.2f}, lower: {bands['lower'][-1]:.2f}")
-                return 1
+                return 1 * self.weight
                 
             elif current_price > bands['upper'][-1]:  # Prezzo sopra Upper Band
                 logger.info(f"Bollinger overbought, prezzo: {current_price:.2f}, upper: {bands['upper'][-1]:.2f}")
-                return -1
+                return -1 * self.weight
                 
             # Calcola %B per segnali avanzati
             percent_b = self._calculate_percent_b(
@@ -139,13 +150,13 @@ class BollingerGene(Gene):
                 confidence = (0.2 - percent_b) / 0.15  # Scala tra 0-1
                 if confidence > self.signal_threshold:
                     logger.info(f"Bollinger momentum bullish, confidence: {confidence:.2f}")
-                    return 0.5
+                    return 0.5 * self.weight
                     
             elif 0.8 < percent_b < 0.95 and not volatility_expanding:
                 confidence = (percent_b - 0.8) / 0.15
                 if confidence > self.signal_threshold:
                     logger.info(f"Bollinger momentum bearish, confidence: {confidence:.2f}")
-                    return -0.5
+                    return -0.5 * self.weight
             
             logger.debug(f"Bollinger neutrale, %B: {percent_b:.2f}, Bandwidth: {bandwidth:.2f}")
             return 0
