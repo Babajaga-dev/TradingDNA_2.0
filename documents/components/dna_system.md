@@ -25,6 +25,11 @@ cli/
 │   ├── dna_handler.py     # Handler principale DNA
 │   ├── dna_analysis.py    # Analisi geni
 │   └── dna_optimization.py # Ottimizzazione
+tests/
+├── test_dna_system.py     # Test sistema DNA
+├── test_rsi_gene.py       # Test gene RSI
+├── test_macd_gene.py      # Test gene MACD
+└── test_pattern_recognition.py # Test pattern recognition
 ```
 
 ## Architettura
@@ -98,6 +103,63 @@ cli/
      }
      ```
 
+## Test Coverage
+1. **Test Sistema DNA**
+   - Signal Generation:
+     ```python
+     # Test generazione segnali
+     def test_dna_system():
+         # Verifica segnale strategia
+         assert -1 <= signal <= 1
+         assert abs(signal) >= min_confidence
+         
+         # Verifica metriche
+         assert metrics['win_rate'] >= min_win_rate
+         assert metrics['max_drawdown'] <= max_drawdown
+     ```
+   
+2. **Test Pattern**
+   - Trend Detection:
+     ```python
+     class StrongSignalGene:
+         def generate_signal(self, data):
+             # Calcola trend sugli ultimi 5 punti
+             window = min(5, len(data))
+             returns = data['close'].pct_change()
+             trend = returns.mean()
+             
+             # Genera segnale basato sul trend
+             if abs(trend) < 0.001:  # Trend laterale
+                 return 0
+             elif trend > 0:
+                 return min(abs(trend * 100), 1.0)
+             else:
+                 return -min(abs(trend * 100), 1.0)
+     ```
+
+3. **Test Dataset**
+   - Dati Sintetici:
+     ```python
+     def sample_data():
+         # Genera trend sinusoidale
+         t = np.linspace(0, 4*np.pi, n_points)
+         trend = 5 * np.sin(t)
+         noise = np.random.normal(0, 0.1, n_points)
+         prices = base_price + trend + noise
+     ```
+
+4. **Acceptance Criteria**
+   - Signal Validation:
+     - Confidence minima rispettata ✓
+     - Latenza sotto soglia ✓
+     - Win rate minimo ✓
+     - Drawdown massimo ✓
+   - Edge Cases:
+     - Dati insufficienti ✓
+     - Trend laterale ✓
+     - Alta volatilità ✓
+     - Segnali contrastanti ✓
+
 ## Interazioni
 - Riceve dati dal Sistema Nervoso
 - Comunica con Sistema Riproduttivo per evoluzione
@@ -127,12 +189,6 @@ DNA Health Score: 0.85
     └── Resources: 0.88
 ```
 
-## Test Coverage
-- Test unitari per ogni componente
-- Test integrazione tra moduli
-- Test performance con dati reali
-- Validazione metriche
-
 ## CLI Interface
 ```bash
 # Inizializzazione DNA
@@ -144,6 +200,9 @@ python main.py dna gene --type macd
 python main.py dna gene --type bollinger
 python main.py dna gene --type volume
 
+# Analisi completa sistema
+python main.py dna analyze
+
 # Ottimizzazione parametri
 python main.py dna optimize
 
@@ -152,6 +211,51 @@ python main.py dna validate
 
 # Composizione segnali
 python main.py dna compose
+```
+
+## Output Analisi
+```
+# Stati Geni
+┌─────────────┬────────┬────────────────────────────┐
+│ Gene        │ Stato  │ Parametri                  │
+├─────────────┼────────┼────────────────────────────┤
+│ RSI         │ Attivo │ period: 14, threshold: 0.6 │
+│ MACD        │ Attivo │ fast: 12, slow: 26        │
+│ Bollinger   │ Attivo │ period: 20, std: 2.0      │
+│ Volume      │ Attivo │ ma_period: 20             │
+└─────────────┴────────┴────────────────────────────┘
+
+# Segnali Correnti
+┌─────────────┬─────────┬───────┐
+│ Gene        │ Segnale │ Forza │
+├─────────────┼─────────┼───────┤
+│ RSI         │ 🟢 BUY  │ 0.85  │
+│ MACD        │ ⚪ HOLD │ 0.12  │
+│ Bollinger   │ 🔴 SELL │ 0.65  │
+│ Volume      │ 🟢 BUY  │ 0.45  │
+└─────────────┴─────────┴───────┘
+
+# Metriche Performance
+┌─────────────┬──────────┬───────────────┬─────────┐
+│ Gene        │ Win Rate │ Profit Factor │ Fitness │
+├─────────────┼──────────┼───────────────┼─────────┤
+│ RSI         │ 62.5%    │ 1.85          │ 0.78    │
+│ MACD        │ 58.2%    │ 1.65          │ 0.72    │
+│ Bollinger   │ 65.1%    │ 2.10          │ 0.82    │
+│ Volume      │ 55.8%    │ 1.45          │ 0.68    │
+└─────────────┴──────────┴───────────────┴─────────┘
+
+# Performance Strategia
+┌─────────────────────────────────┐
+│     Performance Strategia       │
+├─────────────────────────────────┤
+│ Segnale: BUY (0.6542)          │
+│                                 │
+│ Win Rate: 61.2%                │
+│ Profit Factor: 1.85            │
+│ Sharpe Ratio: 1.65             │
+│ Max Drawdown: -12.5%           │
+└─────────────────────────────────┘
 ```
 
 ## Configurazione
@@ -222,7 +326,7 @@ dna:
 3. **Codice**
    - Type hints obbligatori
    - Docstrings complete
-   - Test coverage 80%+
+   - Test coverage 90%+
    - Logging per modulo
 
 4. **Visual**

@@ -151,8 +151,14 @@ indicators:
   volume:
     vwap_period: 14
     volume_ma_period: 20
-    price_volume_ma_period: 30
     signal_threshold: 0.6
+    weight: 1.0
+
+  # Strong Signal
+  strong_signal:
+    window_size: 5
+    trend_threshold: 0.001
+    signal_multiplier: 100.0
     weight: 1.0
     
   # Parametri calcolo
@@ -204,6 +210,15 @@ optimization:
   max_workers: 4
   
   # Bounds per ottimizzazione parametri
+  pattern_recognition:
+    min_pattern_length: [3, 10]
+    max_pattern_length: [15, 30]
+    min_confidence: [0.5, 0.9]
+    similarity_threshold: [0.6, 0.95]
+    correlation_weight: [0.2, 0.6]
+    length_weight: [0.1, 0.4]
+    quality_threshold: [0.4, 0.8]
+
   rsi:
     period: [5, 30]
     overbought: [60, 85]
@@ -224,8 +239,13 @@ optimization:
   volume:
     vwap_period: [5, 30]
     volume_ma_period: [10, 40]
-    price_volume_ma_period: [20, 50]
     signal_threshold: [0.3, 0.9]
+
+  strong_signal:
+    window_size: [3, 10]
+    trend_threshold: [0.0005, 0.002]
+    signal_multiplier: [50.0, 150.0]
+    weight: [0.5, 1.5]
 
 # Configurazione logging
 logging:

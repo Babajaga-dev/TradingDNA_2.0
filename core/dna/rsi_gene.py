@@ -33,8 +33,6 @@ class RSIGene(Gene):
         self.signal_threshold: float = config.get('signal_threshold', 0.6)
         self.weight: float = config.get('weight', 1.0)
         
-        logger.info(f"Inizializzato RSI con periodo {self.period}")
-        
     def calculate(self, data: pd.DataFrame) -> np.ndarray:
         """Calcola i valori RSI.
         
@@ -48,11 +46,11 @@ class RSIGene(Gene):
             ValueError: Se manca la colonna 'close' nel DataFrame o se non ci sono abbastanza dati
         """
         if 'close' not in data.columns:
-            logger.error("Colonna 'close' mancante nel DataFrame")
+            logger.debug("Colonna 'close' mancante nel DataFrame")
             raise ValueError("DataFrame deve contenere la colonna 'close'")
             
         if len(data) < self.period + 1:
-            logger.error(f"Dati insufficienti per calcolare RSI. Richiesti almeno {self.period + 1} punti")
+            logger.debug(f"Dati insufficienti per calcolare RSI. Richiesti almeno {self.period + 1} punti")
             raise ValueError(f"Sono necessari almeno {self.period + 1} punti per calcolare RSI")
             
         # Calcola le variazioni di prezzo
@@ -91,7 +89,6 @@ class RSIGene(Gene):
         # Riempi i primi valori con la media mobile
         rsi[:self.period] = np.nanmean(rsi[self.period:self.period*2])
         
-        logger.debug(f"Calcolato RSI, ultimi valori: {rsi[-5:]}")
         return rsi
         
     def generate_signal(self, data: pd.DataFrame) -> float:
@@ -105,31 +102,28 @@ class RSIGene(Gene):
         """
         try:
             if len(data) < self.period + 1:
-                logger.warning("Dati insufficienti per generare segnale RSI")
+                logger.debug("Dati insufficienti per generare segnale RSI")
                 return 0
                 
             rsi = self.calculate(data)
             current_rsi = rsi[-1]
             
             if np.isnan(current_rsi):
-                logger.warning("RSI corrente è NaN, nessun segnale generato")
+                logger.debug("RSI corrente è NaN, nessun segnale generato")
                 return 0
             
             if current_rsi < self.oversold:
                 confidence = (self.oversold - current_rsi)/(self.oversold)
                 signal = 1 if confidence > self.signal_threshold else 0
-                logger.info(f"RSI oversold ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")
                 return signal * self.weight
                 
             elif current_rsi > self.overbought:
                 confidence = (current_rsi - self.overbought)/(100 - self.overbought)
                 signal = -1 if confidence > self.signal_threshold else 0
-                logger.info(f"RSI overbought ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")
                 return signal * self.weight
                 
-            logger.debug(f"RSI neutrale ({current_rsi:.2f}), nessun segnale")
             return 0
             
         except Exception as e:
-            logger.error(f"Errore nel calcolo del segnale RSI: {str(e)}")
+            logger.debug(f"Errore nel calcolo del segnale RSI: {str(e)}")
             return 0

@@ -4,39 +4,8 @@ import pytest
 import pandas as pd
 import numpy as np
 from core.dna.dna import DNA
+from core.dna.strong_signal_gene import StrongSignalGene
 from utils.config import load_config
-
-class GeneMetrics:
-    """Classe per le metriche dei geni."""
-    def calculate_fitness(self):
-        return 1.0
-
-class StrongSignalGene:
-    """Gene di test che genera segnali forti costanti."""
-    def __init__(self, name, signal_value):
-        self.name = name
-        self._signal = signal_value
-        self.metrics = GeneMetrics()
-        self.min_data_points = 5  # Ridotto per testing
-
-    def generate_signal(self, data):
-        """Genera un segnale basato sul trend dei dati incrementali."""
-        if len(data) < self.min_data_points:
-            return 0
-            
-        # Calcola trend sugli ultimi 5 punti
-        window = min(5, len(data))
-        recent_data = data.iloc[-window:]
-        returns = recent_data['close'].pct_change().fillna(0)
-        trend = returns.mean()
-        
-        # Genera segnale basato sul trend e forza base
-        if abs(trend) < 0.001:  # Trend laterale
-            return 0
-        elif trend > 0:
-            return min(abs(trend * 100), 1.0) * self._signal  # Scala il segnale base
-        else:
-            return -min(abs(trend * 100), 1.0) * self._signal
 
 @pytest.fixture
 def sample_data():
@@ -88,11 +57,19 @@ def test_dna_system(sample_data, dna_config):
     # Reset DNA instance per test pulito
     dna.genes = {}
 
+    # Configurazione per i geni di test
+    strong_signal_config = {
+        'window_size': 5,
+        'trend_threshold': 0.001,
+        'signal_multiplier': 100.0,
+        'weight': 1.0
+    }
+
     # Aggiungi più geni con segnali forti per superare la soglia minima
-    dna.add_gene(StrongSignalGene('strong_buy1', 1.0))
-    dna.add_gene(StrongSignalGene('strong_buy2', 1.0))
-    dna.add_gene(StrongSignalGene('strong_buy3', 1.0))
-    dna.add_gene(StrongSignalGene('strong_buy4', 0.9))
+    dna.add_gene(StrongSignalGene({'weight': 1.0, **strong_signal_config}))
+    dna.add_gene(StrongSignalGene({'weight': 1.0, **strong_signal_config}))
+    dna.add_gene(StrongSignalGene({'weight': 0.9, **strong_signal_config}))
+    dna.add_gene(StrongSignalGene({'weight': 0.8, **strong_signal_config}))
 
     # Test generazione segnale strategia
     start_time = datetime.now()
@@ -125,3 +102,52 @@ def test_dna_system(sample_data, dna_config):
     # Verifica numero minimo trade
     assert metrics['num_trades'] >= config['min_trades'], \
         f"Numero trade {metrics['num_trades']} sotto minimo {config['min_trades']}"
+
+def test_strong_signal_gene():
+    """Test specifico per StrongSignalGene."""
+    # Crea dati di test
+    n_points = 20
+    prices = np.full(n_points, 100.0, dtype=np.float64)  # Usa float64
+    prices[10:] = prices[10:] * 1.01  # Crea un trend rialzista del 1%
+    
+    data = pd.DataFrame({
+        'open': prices,
+        'high': prices * 1.001,
+        'low': prices * 0.999,
+        'close': prices,
+        'volume': np.random.uniform(3000, 5000, n_points)
+    })
+    
+    # Configura e inizializza gene
+    config = {
+        'window_size': 5,
+        'trend_threshold': 0.001,
+        'signal_multiplier': 100.0,
+        'weight': 1.0
+    }
+    gene = StrongSignalGene(config)
+    
+    # Test calcolo trend
+    calculations = gene.calculate(data)
+    assert 'returns' in calculations
+    assert 'trend' in calculations
+    assert len(calculations['returns']) == len(data)
+    assert len(calculations['trend']) == len(data)
+    
+    # Test generazione segnale
+    signal = gene.generate_signal(data)
+    assert -1 <= signal <= 1
+    
+    # Test dati insufficienti
+    short_data = data.iloc[:3]
+    assert gene.generate_signal(short_data) == 0
+    
+    # Test trend laterale
+    flat_data = pd.DataFrame({
+        'open': np.full(10, 100.0, dtype=np.float64),
+        'high': np.full(10, 100.1, dtype=np.float64),
+        'low': np.full(10, 99.9, dtype=np.float64),
+        'close': np.full(10, 100.0, dtype=np.float64),
+        'volume': np.full(10, 3000.0, dtype=np.float64)
+    })
+    assert abs(gene.generate_signal(flat_data)) < 0.1

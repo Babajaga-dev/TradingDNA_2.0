@@ -51,8 +51,10 @@ def setup_argparse() -> argparse.ArgumentParser:
     
     # Comando: dna
     dna_parser = subparsers.add_parser("dna", help="Sistema DNA")
-    dna_parser.add_argument("action", choices=["init", "analyze", "indicators", "score"],
+    dna_parser.add_argument("action", choices=["init", "analyze", "indicators", "score", "gene"],
                           help="Azione DNA")
+    dna_parser.add_argument("--type", choices=["rsi", "macd", "bollinger", "volume"],
+                          help="Tipo di gene da analizzare")
     dna_parser.add_argument("--pair", help="Coppia di trading (es. BTC/USDT)")
     dna_parser.add_argument("--timeframe", help="Timeframe specifico")
     

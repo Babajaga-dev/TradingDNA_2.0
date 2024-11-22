@@ -33,8 +33,6 @@ class Gene(ABC):
         self.params = config['indicators'].get(name, {})
         self.param_bounds = config['optimization'].get(name, {})
         
-        logger.info(f"Inizializzato gene {name} con parametri: {self.params}")
-        
     @abstractmethod
     def calculate(self, data: pd.DataFrame) -> Union[np.ndarray, Tuple[np.ndarray, ...]]:
         """Calcola i valori dell'indicatore.
@@ -66,7 +64,14 @@ class Gene(ABC):
             results: Dizionario con i risultati delle operazioni
         """
         self.metrics.update(results)
-        logger.debug(f"Aggiornate metriche gene {self.name}: {self.metrics.to_dict()}")
+
+    def get_state(self) -> Dict[str, float]:
+        """Restituisce lo stato corrente del gene.
+        
+        Returns:
+            Dict[str, float]: Dizionario con i parametri correnti
+        """
+        return self.params
 
     def _calculate_fitness(self, params: np.ndarray, data: pd.DataFrame) -> float:
         """Calcola il fitness score per un set di parametri.
@@ -118,14 +123,11 @@ class Gene(ABC):
             # Ripristina parametri originali
             self.params = original_params
 
-    def optimize_params(self, data: pd.DataFrame) -> None:
+    def optimize(self, data: pd.DataFrame) -> None:
         """Ottimizza i parametri del gene sui dati forniti."""
         if not self.param_bounds:
-            logger.info(f"Nessun parametro da ottimizzare per {self.name}")
             return
             
-        logger.info(f"Avvio ottimizzazione parametri gene {self.name}")
-        
         try:
             # Prepara bounds e parametri iniziali
             param_names = list(self.param_bounds.keys())
@@ -146,15 +148,11 @@ class Gene(ABC):
                 for i, name in enumerate(param_names):
                     self.params[name] = result.x[i]
                     
-                logger.info(f"Ottimizzazione {self.name} completata: {dict(zip(param_names, result.x))}")
-                
                 # Calcola e aggiorna metriche con nuovi parametri
                 signals = np.array([self.generate_signal(data.iloc[:i+1]) 
                                   for i in range(len(data))])
                 self.metrics.calculate_auto_tuning_metrics(signals)
                 
-            else:
-                logger.warning(f"Ottimizzazione {self.name} non convergente: {result.message}")
-                
         except Exception as e:
-            logger.error(f"Errore nell'ottimizzazione {self.name}: {str(e)}")
+            logger.debug(f"Errore nell'ottimizzazione {self.name}: {str(e)}")
+            raise

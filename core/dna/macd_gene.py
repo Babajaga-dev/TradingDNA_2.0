@@ -33,8 +33,6 @@ class MACDGene(Gene):
         self.signal_threshold: float = config.get('signal_threshold', 0.3)  # Ridotta da 0.6 a 0.3
         self.weight: float = config.get('weight', 1.0)
         
-        logger.info(f"Inizializzato MACD con periodi {self.fast_period}/{self.slow_period}/{self.signal_period}")
-        
     def _ema(self, data: np.ndarray, period: int, start_index: int = 0) -> np.ndarray:
         """Calcola l'EMA (Exponential Moving Average).
         
@@ -78,12 +76,12 @@ class MACDGene(Gene):
             ValueError: Se manca la colonna 'close' nel DataFrame o non ci sono abbastanza dati
         """
         if 'close' not in data.columns:
-            logger.error("Colonna 'close' mancante nel DataFrame")
+            logger.debug("Colonna 'close' mancante nel DataFrame")
             raise ValueError("DataFrame deve contenere la colonna 'close'")
             
         min_periods = max(self.fast_period, self.slow_period) + self.signal_period
         if len(data) < min_periods:
-            logger.error(f"Dati insufficienti per calcolare MACD. Richiesti almeno {min_periods} punti")
+            logger.debug(f"Dati insufficienti per calcolare MACD. Richiesti almeno {min_periods} punti")
             raise ValueError(f"Sono necessari almeno {min_periods} punti per calcolare MACD")
             
         close_prices = data['close'].values
@@ -103,7 +101,6 @@ class MACDGene(Gene):
         # Calcola Histogram
         histogram = macd_line - signal_line
         
-        logger.debug(f"Calcolato MACD, ultimi valori: {macd_line[-5:]}")
         return macd_line, signal_line, histogram
         
     def _calculate_trend_strength(self, values: np.ndarray) -> float:
@@ -149,7 +146,7 @@ class MACDGene(Gene):
         try:
             min_periods = max(self.fast_period, self.slow_period, self.signal_period)
             if len(data) < min_periods + 5:  # Ridotto da 10 a 5 per l'analisi del trend
-                logger.warning(f"Dati insufficienti per generare segnale MACD")
+                logger.debug(f"Dati insufficienti per generare segnale MACD")
                 return 0
                 
             macd_line, signal_line, histogram = self.calculate(data)
@@ -157,7 +154,7 @@ class MACDGene(Gene):
             # Verifica che ci siano abbastanza dati validi
             valid_data = ~np.isnan(macd_line) & ~np.isnan(signal_line) & ~np.isnan(histogram)
             if np.sum(valid_data) < 5:  # Ridotto da 10 a 5
-                logger.warning("Dati validi insufficienti per l'analisi del trend")
+                logger.debug("Dati validi insufficienti per l'analisi del trend")
                 return 0
                 
             # Prendi gli ultimi 5 valori validi
@@ -171,11 +168,6 @@ class MACDGene(Gene):
             price_strength = self._calculate_trend_strength(last_prices)
             hist_strength = self._calculate_trend_strength(last_hist)
             
-            # Log dei valori per debug
-            logger.debug(f"MACD strength: {macd_strength:.4f}")
-            logger.debug(f"Price strength: {price_strength:.4f}")
-            logger.debug(f"Histogram strength: {hist_strength:.4f}")
-            
             # Calcola la forza complessiva del trend dando più peso al MACD
             total_strength = (macd_strength * 1.5 + price_strength + hist_strength) / 3
             
@@ -183,19 +175,16 @@ class MACDGene(Gene):
             if (total_strength > 0 and 
                 last_macd[-1] > last_signal[-1] and
                 abs(total_strength) > self.signal_threshold):
-                logger.info(f"Trend rialzista rilevato, strength: {total_strength:.4f}")
                 return 1 * self.weight
                 
             # Verifica trend ribassista
             elif (total_strength < 0 and 
                   last_macd[-1] < last_signal[-1] and
                   abs(total_strength) > self.signal_threshold):
-                logger.info(f"Trend ribassista rilevato, strength: {total_strength:.4f}")
                 return -1 * self.weight
             
-            logger.debug(f"Nessun trend significativo rilevato, strength: {total_strength:.4f}")
             return 0
             
         except Exception as e:
-            logger.error(f"Errore nel calcolo del segnale MACD: {str(e)}")
+            logger.debug(f"Errore nel calcolo del segnale MACD: {str(e)}")
             return 0

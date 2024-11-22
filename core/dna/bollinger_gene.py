@@ -32,8 +32,6 @@ class BollingerGene(Gene):
         self.signal_threshold: float = config.get('signal_threshold', 0.8)
         self.weight: float = config.get('weight', 1.0)
         
-        logger.info(f"Inizializzato Bollinger con periodo {self.period} e {self.std_dev} deviazioni standard")
-        
     def calculate(self, data: pd.DataFrame) -> Dict[str, np.ndarray]:
         """Calcola le Bollinger Bands.
         
@@ -50,7 +48,7 @@ class BollingerGene(Gene):
             ValueError: Se manca la colonna 'close' nel DataFrame
         """
         if 'close' not in data.columns:
-            logger.error("Colonna 'close' mancante nel DataFrame")
+            logger.debug("Colonna 'close' mancante nel DataFrame")
             raise ValueError("DataFrame deve contenere la colonna 'close'")
             
         close_prices = data['close'].values
@@ -69,7 +67,6 @@ class BollingerGene(Gene):
         upper_band = middle_band + (std * self.std_dev)
         lower_band = middle_band - (std * self.std_dev)
         
-        logger.debug(f"Calcolate Bollinger Bands, ultimi valori MB: {middle_band[-5:]}")
         return {
             'middle': middle_band,
             'upper': upper_band,
@@ -110,8 +107,22 @@ class BollingerGene(Gene):
             
         Returns:
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
+            
+        Raises:
+            ValueError: Se il DataFrame è vuoto o manca la colonna 'close'
         """
+        if data.empty:
+            raise ValueError("DataFrame vuoto")
+            
+        if 'close' not in data.columns:
+            raise ValueError("DataFrame deve contenere la colonna 'close'")
+            
         try:
+            # Verifica dati sufficienti
+            if len(data) < self.period:
+                logger.debug(f"Dati insufficienti ({len(data)} < {self.period})")
+                return 0
+                
             bands = self.calculate(data)
             current_price = data['close'].iloc[-1]
             
@@ -127,12 +138,10 @@ class BollingerGene(Gene):
             
             # Segnali di trading base
             if current_price < bands['lower'][-1]:  # Prezzo sotto Lower Band
-                logger.info(f"Bollinger oversold, prezzo: {current_price:.2f}, lower: {bands['lower'][-1]:.2f}")
-                return 1 * self.weight
+                return 1.0 * self.weight  # Segnale di acquisto
                 
             elif current_price > bands['upper'][-1]:  # Prezzo sopra Upper Band
-                logger.info(f"Bollinger overbought, prezzo: {current_price:.2f}, upper: {bands['upper'][-1]:.2f}")
-                return -1 * self.weight
+                return -1.0 * self.weight  # Segnale di vendita
                 
             # Calcola %B per segnali avanzati
             percent_b = self._calculate_percent_b(
@@ -149,18 +158,15 @@ class BollingerGene(Gene):
             if 0.05 < percent_b < 0.2 and not volatility_expanding:
                 confidence = (0.2 - percent_b) / 0.15  # Scala tra 0-1
                 if confidence > self.signal_threshold:
-                    logger.info(f"Bollinger momentum bullish, confidence: {confidence:.2f}")
                     return 0.5 * self.weight
                     
             elif 0.8 < percent_b < 0.95 and not volatility_expanding:
                 confidence = (percent_b - 0.8) / 0.15
                 if confidence > self.signal_threshold:
-                    logger.info(f"Bollinger momentum bearish, confidence: {confidence:.2f}")
                     return -0.5 * self.weight
             
-            logger.debug(f"Bollinger neutrale, %B: {percent_b:.2f}, Bandwidth: {bandwidth:.2f}")
             return 0
             
         except Exception as e:
-            logger.error(f"Errore nel calcolo del segnale Bollinger: {str(e)}")
-            return 0
+            logger.debug(f"Errore nel calcolo del segnale Bollinger: {str(e)}")
+            raise  # Propaga l'errore invece di restituire 0

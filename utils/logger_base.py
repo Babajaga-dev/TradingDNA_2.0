@@ -5,6 +5,8 @@ from pathlib import Path
 from rich.console import Console
 from rich.theme import Theme
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
+from queue import Queue
+from threading import Lock
 
 # Tema Rich
 custom_theme = Theme({
@@ -16,12 +18,17 @@ custom_theme = Theme({
 })
 
 console = Console(theme=custom_theme)
+_progress_active = False
+_message_queue = Queue()
+_lock = Lock()
+_initialization_shown = False
 
 class ComponentLogger:
     """Logger specifico per componenti del sistema"""
     def __init__(self, component_name: str):
-        self.name = component_name
-        self.logger = logging.getLogger(component_name)
+        # Gestisce i nomi composti prendendo solo l'ultima parte
+        self.name = component_name.split('.')[-1]
+        self.logger = logging.getLogger('system')  # Usa un logger generico
         self.icons = {
             'DNA': '🧬',
             'IMMUNE': '🛡️',
@@ -34,36 +41,73 @@ class ComponentLogger:
     def _format_message(self, message: str) -> str:
         """Formatta il messaggio con icona del componente"""
         icon = self.icons.get(self.name.upper(), '•')
-        return f"{icon} {self.name:<12} │ {message}"
+        # Usa esattamente 15 caratteri per il nome del componente
+        component_name = f"{self.name:<15}"
+        return f"{icon} {component_name}│ {message}"
+        
+    def _log_message(self, level: int, message: str):
+        global _progress_active, _initialization_shown
+        formatted_message = self._format_message(message)
+        
+        with _lock:
+            if message == "Inizializzazione DNA system" and not _initialization_shown:
+                _initialization_shown = True
+                console.print("\nInizializzazione DNA system...\n")
+            elif _progress_active or "Aggiunto gene" in message or "Stato DNA salvato" in message:
+                _message_queue.put((level, formatted_message))
+            else:
+                self.logger.log(level, formatted_message)
         
     def debug(self, message: str):
-        self.logger.debug(self._format_message(message))
+        self._log_message(logging.DEBUG, message)
         
     def info(self, message: str):
-        self.logger.info(self._format_message(message))
+        self._log_message(logging.INFO, message)
         
     def warning(self, message: str):
-        self.logger.warning(self._format_message(message))
+        self._log_message(logging.WARNING, message)
         
     def error(self, message: str):
-        self.logger.error(self._format_message(message))
+        self._log_message(logging.ERROR, message)
         
     def critical(self, message: str):
-        self.logger.critical(self._format_message(message))
+        self._log_message(logging.CRITICAL, message)
+
+class ProgressLoggerWrapper:
+    """Wrapper per il Progress logger che gestisce l'accodamento dei messaggi"""
+    def __init__(self):
+        self.progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description:<50}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TimeRemainingColumn(),
+            transient=True,  # Rimuove la barra quando completata
+            expand=True
+        )
+        
+    def __enter__(self):
+        global _progress_active
+        _progress_active = True
+        return self.progress.__enter__()
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        global _progress_active
+        result = self.progress.__exit__(exc_type, exc_val, exc_tb)
+        _progress_active = False
+        
+        console.print()  # Aggiunge una riga vuota dopo la barra
+        
+        # Processa i messaggi in coda
+        while not _message_queue.empty():
+            level, message = _message_queue.get()
+            logging.getLogger('system').log(level, message)
+        
+        return result
 
 def get_progress_logger():
-    """Ottiene un progress logger configurato con Rich.
-    
-    Returns:
-        Progress: Un context manager per tracciare il progresso delle operazioni
-    """
-    return Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TaskProgressColumn(),
-        TimeRemainingColumn()
-    )
+    """Ottiene un progress logger configurato con Rich."""
+    return ProgressLoggerWrapper()
 
 def setup_logging(config_file: str = None):
     """Configura il sistema di logging"""
@@ -80,7 +124,7 @@ def setup_logging(config_file: str = None):
     except Exception as e:
         logging.basicConfig(
             level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            format='%(asctime)s - %(message)s'  # Formato minimo
         )
         logging.warning(f"Errore caricamento config logging: {e}. Usando config base.")
         return None, None
@@ -90,7 +134,7 @@ def setup_logging(config_file: str = None):
     
     # Configurazione globale
     log_level = getattr(logging, config['global']['log_level'])
-    log_format = config['global']['format']
+    log_format = '%(asctime)s - %(message)s'  # Formato minimo
     date_format = config['global']['date_format']
     
     logging.basicConfig(

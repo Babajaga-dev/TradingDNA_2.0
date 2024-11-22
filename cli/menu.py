@@ -90,8 +90,8 @@ def handle_dna_menu(commands: dict):
             '3': ("Ottimizzazione", lambda: commands["dna"](argparse.Namespace(action='optimize'))),
             '4': ("Validazione", lambda: commands["dna"](argparse.Namespace(action='validate'))),
             '5': ("Composizione", lambda: commands["dna"](argparse.Namespace(action='compose'))),
-            '6': ("Analisi Pattern", lambda: commands["dna"](argparse.Namespace(action='analyze', pair=None, timeframe=None))),
-            '7': ("Indicatori Tecnici", lambda: commands["dna"](argparse.Namespace(action='indicators', pair=None, timeframe=None))),
+            '6': ("Analisi Pattern", lambda: commands["dna"](argparse.Namespace(action='analyze'))),
+            '7': ("Indicatori Tecnici", lambda: commands["dna"](argparse.Namespace(action='indicators'))),
             '8': ("DNA Scoring", lambda: commands["dna"](argparse.Namespace(action='score')))
         }
         

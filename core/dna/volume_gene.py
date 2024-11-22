@@ -29,21 +29,16 @@ class VolumeGene(Gene):
             config = load_config('dna.yaml')
             config = config.get('indicators', {}).get('volume', {})
             
-        self.params = {
-            'vwap_period': config.get('vwap_period', 20),
-            'volume_ma_period': config.get('volume_ma_period', 20),
-            'signal_threshold': config.get('signal_threshold', 0.1),
-            'weight': config.get('weight', 1.0)
-        }
+        self.vwap_period: int = config.get('vwap_period', 20)
+        self.volume_ma_period: int = config.get('volume_ma_period', 20)
+        self.signal_threshold: float = config.get('signal_threshold', 0.1)
+        self.weight: float = config.get('weight', 1.0)
         
-        logger.info(f"Inizializzato Volume con parametri: {self.params}")
-        
-    def calculate(self, data: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def calculate(self, data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calcola gli indicatori di volume.
         
         Args:
             data: DataFrame con colonne OHLCV
-            params: Parametri opzionali da usare invece di self.params
             
         Returns:
             Tuple[np.ndarray, np.ndarray, np.ndarray]: 
@@ -54,17 +49,14 @@ class VolumeGene(Gene):
         Raises:
             ValueError: Se mancano le colonne OHLCV o non ci sono abbastanza dati
         """
-        if params is None:
-            params = self.params
-            
         required_columns = ['open', 'high', 'low', 'close', 'volume']
         if not all(col in data.columns for col in required_columns):
-            logger.error("Colonne OHLCV mancanti nel DataFrame")
+            logger.debug("Colonne OHLCV mancanti nel DataFrame")
             raise ValueError("DataFrame deve contenere le colonne OHLCV")
             
-        if len(data) < max(params['vwap_period'], params['volume_ma_period']):
-            logger.error(f"Dati insufficienti per calcolare gli indicatori di volume")
-            raise ValueError(f"Sono necessari almeno {max(params['vwap_period'], params['volume_ma_period'])} punti")
+        if len(data) < max(self.vwap_period, self.volume_ma_period):
+            logger.debug(f"Dati insufficienti per calcolare gli indicatori di volume")
+            raise ValueError(f"Sono necessari almeno {max(self.vwap_period, self.volume_ma_period)} punti")
             
         # Calcola VWAP
         typical_price = (data['high'] + data['low'] + data['close']) / 3
@@ -73,12 +65,12 @@ class VolumeGene(Gene):
         
         vwap_values = np.zeros(len(data))
         for i in range(len(data)):
-            start_idx = max(0, i - params['vwap_period'] + 1)
+            start_idx = max(0, i - self.vwap_period + 1)
             vwap_values[i] = (cumulative_tp_vol.iloc[start_idx:i+1].sum() / 
                             cumulative_vol.iloc[start_idx:i+1].sum())
                 
         # Calcola Volume MA usando rolling window
-        volume_ma = data['volume'].rolling(window=params['volume_ma_period'], min_periods=1).mean()
+        volume_ma = data['volume'].rolling(window=self.volume_ma_period, min_periods=1).mean()
             
         # Calcola OBV (On Balance Volume)
         price_change = data['close'].diff()
@@ -96,28 +88,23 @@ class VolumeGene(Gene):
             else:
                 obv_values[i] = obv_values[i-1]
         
-        logger.debug(f"Calcolati indicatori volume, ultimi valori VWAP: {vwap_values[-5:]}")
         return vwap_values, volume_ma.to_numpy(), obv_values
         
-    def generate_signal(self, data: pd.DataFrame, params: Optional[Dict[str, Any]] = None) -> float:
+    def generate_signal(self, data: pd.DataFrame) -> float:
         """Genera segnale di trading basato sul volume.
         
         Args:
             data: DataFrame con dati OHLCV
-            params: Parametri opzionali da usare invece di self.params
             
         Returns:
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
-        if params is None:
-            params = self.params
-            
         try:
-            if len(data) < max(params['vwap_period'], params['volume_ma_period']):
-                logger.warning("Dati insufficienti per generare segnale volume")
+            if len(data) < max(self.vwap_period, self.volume_ma_period):
+                logger.debug("Dati insufficienti per generare segnale volume")
                 return 0.0
                 
-            vwap, volume_ma, obv = self.calculate(data, params)
+            vwap, volume_ma, obv = self.calculate(data)
             
             # Analisi VWAP e Volume
             price = data['close'].iloc[-1]
@@ -131,76 +118,16 @@ class VolumeGene(Gene):
             signal_strength = min(1.0, (price_distance + volume_strength) / 2)
             
             # Applica threshold
-            if signal_strength < params['signal_threshold']:
-                logger.debug("Segnale sotto threshold")
+            if signal_strength < self.signal_threshold:
                 return 0.0
             
             if price > vwap[-1] and current_volume > volume_ma[-1]:
-                logger.info(f"Segnale rialzista: prezzo sopra VWAP con volume alto")
-                return signal_strength * params['weight']
+                return signal_strength * self.weight
             elif price < vwap[-1] and current_volume > volume_ma[-1]:
-                logger.info(f"Segnale ribassista: prezzo sotto VWAP con volume alto")
-                return -signal_strength * params['weight']
+                return -signal_strength * self.weight
                 
-            logger.debug("Volume neutrale")
             return 0.0
             
         except Exception as e:
-            logger.error(f"Errore nel calcolo del segnale Volume: {str(e)}")
+            logger.debug(f"Errore nel calcolo del segnale Volume: {str(e)}")
             return 0.0
-            
-    def optimize_params(self, data: pd.DataFrame) -> None:
-        """Ottimizza i parametri del gene Volume.
-        
-        Args:
-            data: DataFrame con dati OHLCV
-        """
-        # Carica range parametri da config
-        config = load_config('dna.yaml')
-        opt_config = config['optimization']['volume']
-        
-        vwap_range = opt_config['vwap_period']
-        volume_ma_range = opt_config['volume_ma_period']
-        threshold_range = opt_config['signal_threshold']
-        
-        best_sharpe = -np.inf
-        best_params = self.params.copy()
-        
-        # Calcola returns una volta sola
-        returns = np.diff(data['close']) / data['close'].iloc[:-1]
-        
-        for vwap_p in range(vwap_range[0], vwap_range[1], 2):
-            for vol_p in range(volume_ma_range[0], volume_ma_range[1], 2):
-                for threshold in np.arange(threshold_range[0], threshold_range[1], 0.1):
-                    test_params = {
-                        'vwap_period': vwap_p,
-                        'volume_ma_period': vol_p,
-                        'signal_threshold': threshold,
-                        'weight': self.params['weight']
-                    }
-                    
-                    try:
-                        # Genera segnali per l'intero dataset usando i parametri di test
-                        signals = np.zeros(len(data))
-                        for i in range(max(vwap_p, vol_p), len(data)):
-                            signals[i] = self.generate_signal(data.iloc[:i+1], test_params)
-                        
-                        # Calcola metriche usando i segnali shiftati
-                        strategy_returns = returns * signals[:-1]  # Allinea i segnali con i returns
-                        if len(strategy_returns) > 0 and np.std(strategy_returns) > 0:
-                            sharpe = np.mean(strategy_returns) / np.std(strategy_returns)
-                            
-                            if sharpe > best_sharpe:
-                                best_sharpe = sharpe
-                                best_params = test_params.copy()
-                                
-                    except Exception as e:
-                        logger.error(f"Errore durante l'ottimizzazione: {str(e)}")
-                        continue
-        
-        # Applica i migliori parametri
-        if best_params != self.params:
-            self.params = best_params
-            logger.info(f"Parametri ottimizzati: {self.params}")
-        else:
-            logger.info("Nessun miglioramento trovato durante l'ottimizzazione")
