@@ -7,10 +7,10 @@ import argparse
 import logging
 
 from utils.logger_base import setup_logging
-from cli.menu import handle_menu
+from cli.menu import MainMenu
 from cli.commands import (
-    handle_init, handle_dna, handle_immune, handle_metabolism, 
-    handle_nervous, handle_endocrine, handle_reproductive
+    handle_init, handle_nervous, 
+    handle_endocrine, handle_reproductive
 )
 from cli.handlers import handle_config, handle_download, handle_log
 
@@ -49,15 +49,6 @@ def setup_argparse() -> argparse.ArgumentParser:
     log_parser.add_argument("action", choices=["show", "clear", "test"], help="Azione logging")
     log_parser.add_argument("--module", help="Modulo specifico")
     
-    # Comando: dna
-    dna_parser = subparsers.add_parser("dna", help="Sistema DNA")
-    dna_parser.add_argument("action", choices=["init", "analyze", "indicators", "score", "gene"],
-                          help="Azione DNA")
-    dna_parser.add_argument("--type", choices=["rsi", "macd", "bollinger", "volume"],
-                          help="Tipo di gene da analizzare")
-    dna_parser.add_argument("--pair", help="Coppia di trading (es. BTC/USDT)")
-    dna_parser.add_argument("--timeframe", help="Timeframe specifico")
-    
     return parser
 
 def main():
@@ -74,22 +65,11 @@ def main():
     
     # Mapping comandi
     commands = {
-        "menu": lambda _: handle_menu({
-            "dna": handle_dna,
-            "immune": handle_immune,
-            "metabolism": handle_metabolism,
-            "nervous": handle_nervous,
-            "endocrine": handle_endocrine,
-            "reproductive": handle_reproductive,
-            "config": handle_config,
-            "download": handle_download,
-            "log": handle_log
-        }),
+        "menu": lambda _: MainMenu().run(),  # Usa run() invece di display_menu()
         "init": handle_init,
         "config": handle_config,
         "download": handle_download,
-        "log": handle_log,
-        "dna": handle_dna
+        "log": handle_log
     }
     
     try:

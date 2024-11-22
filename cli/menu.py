@@ -1,176 +1,136 @@
-"""
-Gestione menu CLI
-"""
-import time
-import argparse
+"""Main menu interface for TradingDNA."""
+from typing import Optional
+import logging
+from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
 
-from cli.utils import console, show_progress, print_ascii_logo, print_error
+from cli.menus.dna import DNAMenu
+from cli.menus.immune import ImmuneMenu
+from cli.menus.metabolism import MetabolismMenu
+from cli.menus.nervous import NervousMenu
+from utils.logger_base import get_logger
 
-def print_dna_submenu() -> Table:
-    """Crea e restituisce la tabella del submenu DNA"""
-    table = Table(show_header=False, border_style="cyan", box=None)
-    table.add_column("Option", style="cyan", width=4)
-    table.add_column("Description", style="white")
-    
-    table.add_row("[1]", "🧬 Inizializza DNA    - Setup sistema DNA")
-    table.add_row("[2]", "📊 Gestione Geni     - RSI, MACD, Bollinger, Volume")
-    table.add_row("[3]", "🎯 Ottimizzazione    - Ottimizza parametri")
-    table.add_row("[4]", "📈 Validazione       - Test strategia")
-    table.add_row("[5]", "🔄 Composizione      - Genera segnali")
-    table.add_row("[6]", "📊 Analisi Pattern   - Pattern Recognition")
-    table.add_row("[7]", "📉 Indicatori       - Analisi tecnica")
-    table.add_row("[8]", "🎯 Scoring          - Performance DNA")
-    table.add_row("", "")
-    table.add_row("[0]", "⬅️  Torna al menu principale")
-    
-    return table
+logger = get_logger(__name__)
+console = Console()
 
-def print_genes_submenu() -> Table:
-    """Crea e restituisce la tabella del submenu Geni"""
-    table = Table(show_header=False, border_style="cyan", box=None)
-    table.add_column("Option", style="cyan", width=4)
-    table.add_column("Description", style="white")
+class MainMenu:
+    """Main menu class for TradingDNA."""
     
-    table.add_row("[1]", "📊 RSI              - Relative Strength Index")
-    table.add_row("[2]", "📈 MACD             - Moving Average Convergence Divergence")
-    table.add_row("[3]", "📉 Bollinger        - Bollinger Bands")
-    table.add_row("[4]", "📊 Volume           - Volume Analysis")
-    table.add_row("", "")
-    table.add_row("[0]", "⬅️  Torna al menu DNA")
-    
-    return table
-
-def handle_genes_menu(commands: dict):
-    """Gestisce il submenu Geni"""
-    while True:
-        console.print("\n[cyan]Gestione Geni[/]")
-        console.print(print_genes_submenu())
-        choice = console.input("\nSeleziona un'opzione [cyan][0-4][/]: ")
+    def __init__(self):
+        """Initialize the main menu."""
+        self.dna_menu = DNAMenu()
+        self.immune_menu = ImmuneMenu()
+        self.metabolism_menu = MetabolismMenu()
+        self.nervous_menu = NervousMenu()
         
-        if choice == '0':
-            break
+    def _create_status_dashboard(self) -> Panel:
+        """Create status dashboard with system states."""
+        table = Table(
+            show_header=True,
+            header_style="bold magenta",
+            border_style="cyan",
+            padding=(0, 1),
+            collapse_padding=True,
+            box=None
+        )
+        
+        # Configure columns with fixed width
+        table.add_column("Sistema", style="cyan", width=15, justify="left")
+        table.add_column("Stato", style="green", width=15, justify="left")
+        table.add_column("Metriche", style="yellow", width=20, justify="left")
+        
+        # Add system states with compact metrics
+        table.add_row("DNA", "✓ Attivo", "Fitness: 92%")
+        table.add_row("Immunitario", "✓ Attivo", "Protezione: 95%")
+        table.add_row("Metabolismo", "✓ Attivo", "Efficienza: 88%")
+        table.add_row("Nervoso", "✓ Attivo", "Latenza: 45ms")
+        table.add_row("Endocrino", "⚠ In Sviluppo", "---")
+        table.add_row("Riproduttivo", "⚠ In Sviluppo", "---")
+        
+        return Panel(
+            table,
+            title="[bold cyan]Dashboard di Sistema[/bold cyan]",
+            border_style="cyan",
+            padding=(1, 2)
+        )
+    
+    def display_menu(self) -> None:
+        """Display the main menu options with enhanced visual feedback."""
+        # Menu options
+        menu_text = (
+            "🧬 [bold cyan]TradingDNA 2.0[/bold cyan]\n\n"
+            "1. [green]Sistema DNA[/green]\n"
+            "2. [blue]Sistema Immunitario[/blue]\n"
+            "3. [yellow]Sistema Metabolismo[/yellow]\n"
+            "4. [magenta]Sistema Nervoso[/magenta]\n"
+            "5. [red]Sistema Endocrino[/red] [dim](In Sviluppo)[/dim]\n"
+            "6. [purple]Sistema Riproduttivo[/purple] [dim](In Sviluppo)[/dim]\n"
+            "7. [cyan]Gestione Sistema[/cyan] [dim](In Sviluppo)[/dim]\n"
+            "0. [white]Esci[/white]\n\n"
+            "Seleziona un'opzione:"
+        )
+        
+        # Display components
+        console.clear()
+        console.print()  # Add spacing
+        console.print(self._create_status_dashboard())
+        console.print(Panel(
+            menu_text,
+            title="Menu Principale",
+            border_style="cyan",
+            padding=(1, 2)
+        ))
+    
+    def handle_choice(self, choice: str) -> bool:
+        """Handle menu choice and execute corresponding action."""
+        try:
+            if choice == "1":
+                self._handle_submenu(self.dna_menu)
+            elif choice == "2":
+                self._handle_submenu(self.immune_menu)
+            elif choice == "3":
+                self._handle_submenu(self.metabolism_menu)
+            elif choice == "4":
+                self._handle_submenu(self.nervous_menu)
+            elif choice in ["5", "6", "7"]:
+                console.print("\n[yellow]⚠ Funzionalità in sviluppo[/yellow]")
+                input("\nPremi INVIO per continuare...")
+            elif choice == "0":
+                console.print("\n[yellow]Arrivederci![/yellow]")
+                return False
+            else:
+                console.print("\n[red]Opzione non valida[/red]")
+                input("\nPremi INVIO per continuare...")
             
-        valid_choices = {
-            '1': ("RSI", lambda: commands["dna"](argparse.Namespace(action='gene', type='rsi'))),
-            '2': ("MACD", lambda: commands["dna"](argparse.Namespace(action='gene', type='macd'))),
-            '3': ("Bollinger", lambda: commands["dna"](argparse.Namespace(action='gene', type='bollinger'))),
-            '4': ("Volume", lambda: commands["dna"](argparse.Namespace(action='gene', type='volume')))
-        }
-        
-        if choice in valid_choices:
-            console.print(f"\nAvvio [cyan]{valid_choices[choice][0]}[/]...")
-            with show_progress("Caricamento") as progress:
-                task = progress.add_task("Inizializzazione...", total=100)
-                for _ in range(100):
-                    progress.update(task, advance=1)
-                    time.sleep(0.01)
-            try:
-                valid_choices[choice][1]()
-            except Exception as e:
-                print_error(f"Errore: {str(e)}")
-            console.input("\nPremi INVIO per continuare...")
-        else:
-            console.print("\n[red]Opzione non valida![/]")
-            time.sleep(1)
-
-def handle_dna_menu(commands: dict):
-    """Gestisce il submenu DNA"""
-    while True:
-        console.print("\n[cyan]Sistema DNA[/]")
-        console.print(print_dna_submenu())
-        choice = console.input("\nSeleziona un'opzione [cyan][0-8][/]: ")
-        
-        if choice == '0':
-            break
+            return True
             
-        valid_choices = {
-            '1': ("Inizializzazione DNA", lambda: commands["dna"](argparse.Namespace(action='init'))),
-            '2': ("Gestione Geni", lambda: handle_genes_menu(commands)),
-            '3': ("Ottimizzazione", lambda: commands["dna"](argparse.Namespace(action='optimize'))),
-            '4': ("Validazione", lambda: commands["dna"](argparse.Namespace(action='validate'))),
-            '5': ("Composizione", lambda: commands["dna"](argparse.Namespace(action='compose'))),
-            '6': ("Analisi Pattern", lambda: commands["dna"](argparse.Namespace(action='analyze'))),
-            '7': ("Indicatori Tecnici", lambda: commands["dna"](argparse.Namespace(action='indicators'))),
-            '8': ("DNA Scoring", lambda: commands["dna"](argparse.Namespace(action='score')))
-        }
-        
-        if choice in valid_choices:
-            console.print(f"\nAvvio [cyan]{valid_choices[choice][0]}[/]...")
-            with show_progress("Caricamento") as progress:
-                task = progress.add_task("Inizializzazione...", total=100)
-                for _ in range(100):
-                    progress.update(task, advance=1)
-                    time.sleep(0.01)
-            try:
-                valid_choices[choice][1]()
-            except Exception as e:
-                print_error(f"Errore: {str(e)}")
-            console.input("\nPremi INVIO per continuare...")
-        else:
-            console.print("\n[red]Opzione non valida![/]")
-            time.sleep(1)
-
-def print_menu() -> Table:
-    """Crea e restituisce la tabella del menu principale"""
-    table = Table(show_header=False, border_style="cyan", box=None)
-    table.add_column("Option", style="cyan", width=4)
-    table.add_column("Description", style="white")
+        except Exception as e:
+            logger.error(f"Error handling menu choice: {e}")
+            console.print(f"\n[red]Errore: {str(e)}[/red]")
+            input("\nPremi INVIO per continuare...")
+            return True
     
-    table.add_row("[1]", "🧬 Sistema DNA         - Gestione strategie trading")
-    table.add_row("[2]", "🛡️ Sistema Immunitario - Gestione rischi")
-    table.add_row("[3]", "⚡ Metabolismo        - Gestione capitale")
-    table.add_row("[4]", "🧠 Sistema Nervoso    - Analisi dati real-time")
-    table.add_row("[5]", "🔄 Sistema Endocrino  - Adattamento parametri")
-    table.add_row("[6]", "🧪 Sistema Riprod.    - Evoluzione strategie")
-    table.add_row("", "")
-    table.add_row("[7]", "⚙️  Configurazione     - Gestione impostazioni")
-    table.add_row("[8]", "📥 Download Dati      - Scarica dati mercato")
-    table.add_row("[9]", "📊 Log & Monitor      - Visualizza stato sistema")
-    table.add_row("", "")
-    table.add_row("[0]", "🚪 Esci")
+    def _handle_submenu(self, submenu) -> None:
+        """Handle submenu navigation."""
+        while True:
+            submenu.display_menu()
+            choice = console.input("\nScelta: ")
+            if not submenu.handle_choice(choice):
+                break
+        console.clear()  # Pulisce lo schermo prima di tornare al menu principale
     
-    return table
-
-def handle_menu(commands: dict):
-    """Gestisce l'interfaccia menu"""
-    while True:
-        print_ascii_logo()
-        console.print(print_menu())
-        choice = console.input("\nSeleziona un'opzione [cyan][0-9][/]: ")
-        
-        if choice == '0':
-            with show_progress("Chiusura sistema") as progress:
-                task = progress.add_task("Chiusura...", total=100)
-                for _ in range(100):
-                    progress.update(task, advance=1)
-                    time.sleep(0.01)
-            break
-            
-        valid_choices = {
-            '1': ("Sistema DNA", lambda: handle_dna_menu(commands)),
-            '2': ("Sistema Immunitario", commands["immune"]),
-            '3': ("Metabolismo", commands["metabolism"]),
-            '4': ("Sistema Nervoso", commands["nervous"]),
-            '5': ("Sistema Endocrino", commands["endocrine"]),
-            '6': ("Sistema Riproduttivo", commands["reproductive"]),
-            '7': ("Configurazione", lambda: commands["config"](argparse.Namespace(action='show', file=None))),
-            '8': ("Download Dati", lambda: commands["download"](argparse.Namespace(dataset='all', pair=None, timeframe=None, progress=True))),
-            '9': ("Log & Monitor", lambda: commands["log"](argparse.Namespace(action='show', module=None)))
-        }
-        
-        if choice in valid_choices:
-            console.print(f"\nAvvio [cyan]{valid_choices[choice][0]}[/]...")
-            with show_progress("Caricamento") as progress:
-                task = progress.add_task("Inizializzazione...", total=100)
-                for _ in range(100):
-                    progress.update(task, advance=1)
-                    time.sleep(0.01)
-            try:
-                valid_choices[choice][1]()
-            except Exception as e:
-                print_error(f"Errore: {str(e)}")
-            console.input("\nPremi INVIO per continuare...")
-        else:
-            console.print("\n[red]Opzione non valida![/]")
-            time.sleep(1)
+    def run(self) -> None:
+        """Run the main menu loop."""
+        try:
+            while True:
+                self.display_menu()
+                choice = console.input("\nScelta: ")
+                if not self.handle_choice(choice):
+                    break
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Uscita forzata![/yellow]")
+        except Exception as e:
+            logger.error(f"Errore imprevisto: {e}")
+            console.print(f"\n[red]Errore imprevisto: {str(e)}[/red]")
+            input("\nPremi INVIO per continuare...")

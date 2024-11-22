@@ -1,0 +1,32 @@
+# Metabolism System Configuration
+
+# Capital Manager Configuration
+capital_manager:
+  initial_capital: 10000.0  # Starting capital amount
+  risk_limit: 0.02         # Maximum risk per trade (2%)
+  min_allocation: 1000.0   # Minimum capital allocation per strategy
+  max_strategies: 5        # Maximum number of concurrent strategies
+
+# Position Sizer Configuration
+position_sizer:
+  max_position_size: 1000.0  # Maximum position size in base currency
+  risk_per_trade: 0.01       # Risk per trade (1% of allocated capital)
+  stop_loss_pct: 0.02        # Default stop loss percentage (2%)
+  max_exposure_pct: 0.8      # Maximum total exposure (80% of capital)
+  min_position_size: 10.0    # Minimum position size in base currency
+  position_step: 1.0         # Position size increment step
+
+# Performance Tracker Configuration
+performance_tracker:
+  metrics_update_interval: 3600  # Update interval in seconds
+  max_trades_history: 1000       # Maximum number of trades to keep in history
+  drawdown_alert: 0.1            # Alert threshold for drawdown (10%)
+  roi_target: 0.2               # Target ROI for performance monitoring
+  risk_free_rate: 0.02          # Risk-free rate for Sharpe/Sortino calculation
+
+# System Integration
+integration:
+  dna_signal_weight: 0.7        # Weight for DNA system signals
+  immune_risk_weight: 0.3       # Weight for immune system risk signals
+  min_signal_strength: 0.3      # Minimum signal strength to consider
+  max_correlation: 0.7          # Maximum correlation between strategies

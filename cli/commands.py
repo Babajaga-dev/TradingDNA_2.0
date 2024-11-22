@@ -9,30 +9,11 @@ from cli.utils import show_progress, console, print_error
 from cli.handlers.log import handle_log
 from cli.handlers.download import handle_download
 from cli.handlers.config import handle_config
-from cli.handlers.dna import handle_dna
 from utils.logger_base import get_component_logger
 from utils.initializer import Initializer, InitializationError
 
 # Setup logger
 logger = get_component_logger('CLI')
-
-def handle_immune():
-    """Gestisce il Sistema Immunitario"""
-    with show_progress("Sistema Immunitario") as progress:
-        task = progress.add_task("Analisi rischi...", total=100)
-        for _ in range(100):
-            progress.update(task, advance=1)
-            time.sleep(0.02)
-    console.print("[red]Sistema Immunitario - Non ancora implementato[/]")
-
-def handle_metabolism():
-    """Gestisce il Sistema Metabolismo"""
-    with show_progress("Sistema Metabolismo") as progress:
-        task = progress.add_task("Analisi capitale...", total=100)
-        for _ in range(100):
-            progress.update(task, advance=1)
-            time.sleep(0.02)
-    console.print("[green]Sistema Metabolismo - Non ancora implementato[/]")
 
 def handle_nervous():
     """Gestisce il Sistema Nervoso"""

@@ -77,3 +77,10 @@ class DNADataError(TradingDNAError):
     """Errore specifico del modulo DNA per la gestione dei dati"""
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(message, details)
+
+class NervousSystemError(TradingDNAError):
+    """Errore specifico del Sistema Nervoso"""
+    def __init__(self, message: str, component: Optional[str] = None, 
+                 details: Optional[Dict[str, Any]] = None):
+        super().__init__(message, details)
+        self.component = component or "unknown"

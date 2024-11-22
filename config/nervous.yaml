@@ -1,0 +1,79 @@
+# Nervous System Configuration
+
+paper_trading:
+  # Paper trading configuration
+  enabled: true
+  timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
+  default_timeframe: "1m"
+  simulation_speed: 1.0  # Moltiplicatore velocità (1.0 = tempo reale)
+  buffer_size: 1000     # Numero di candele da mantenere in memoria
+  pairs:
+    - symbol: "BTC/USDT"
+      min_price: 20000
+      max_price: 50000
+    - symbol: "ETH/USDT" 
+      min_price: 1500
+      max_price: 4000
+
+websocket:
+  # Websocket connection parameters
+  reconnect_interval: 5  # seconds
+  max_retries: 3
+  ping_interval: 30  # seconds
+  timeout: 10  # seconds
+  buffer_size: 1024  # KB
+
+preprocessing:
+  # Data preprocessing parameters
+  outlier_threshold: 3.0  # standard deviations
+  smoothing_window: 5  # periods
+  aggregation_period: "1m"  # 1 minute
+  min_data_points: 100
+  max_gap: 5  # seconds
+  
+patterns:
+  # Pattern recognition parameters
+  min_confidence: 0.85
+  lookback_period: 100
+  validation_threshold: 0.75
+  min_pattern_size: 5
+  max_pattern_size: 50
+  
+technical_analysis:
+  # Technical indicators parameters
+  rsi:
+    period: 14
+    overbought: 70
+    oversold: 30
+  macd:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+  bollinger:
+    period: 20
+    std_dev: 2
+  volume:
+    ma_period: 20
+    threshold: 2.0
+
+performance:
+  # Performance monitoring thresholds
+  max_latency: 10  # milliseconds
+  min_data_quality: 0.99
+  min_pattern_accuracy: 0.85
+  min_signal_noise: 3.0
+  min_throughput: 1000  # events/second
+
+optimization:
+  # Parameter optimization settings
+  update_interval: 3600  # seconds
+  min_samples: 1000
+  learning_rate: 0.01
+  max_iterations: 100
+  
+logging:
+  # Logging configuration
+  level: INFO
+  file_size: 400  # KB
+  backup_count: 5
+  metrics_interval: 60  # seconds

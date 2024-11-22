@@ -52,7 +52,31 @@ class ImmuneSystem:
             'trend': 'neutral',
             'risk_level': 'normal'
         }
+        self._exchange_health = {}  # Track exchange health metrics
         logger.info("Immune System initialized with RiskManager")
+
+    def set_protection_config(self, config: Dict[str, bool]) -> None:
+        """
+        Configure protection mechanisms.
+
+        Args:
+            config: Dictionary with protection settings
+                - dynamic_stops: Enable/disable dynamic stop losses
+                - profit_protection: Enable/disable profit protection
+                - position_scaling: Enable/disable position scaling
+                - market_adaptation: Enable/disable market adaptation
+        """
+        self._risk_manager.set_protection_config(config)
+        logger.info("Updated protection configuration: %s", config)
+
+    def get_protection_config(self) -> Dict[str, bool]:
+        """
+        Get current protection configuration.
+
+        Returns:
+            Dictionary with current protection settings
+        """
+        return self._risk_manager.get_protection_config()
 
     def analyze_risk(self, positions: List[Dict]) -> RiskMetrics:
         """
@@ -91,33 +115,25 @@ class ImmuneSystem:
             asset_correlation=correlation_risk / len(positions) if positions else 0.0
         )
 
-    def calculate_dynamic_stops(
+    def get_position_protection(
         self, 
         position: Dict,
-        volatility: float
-    ) -> Tuple[float, float]:
+        market_data: Optional[Dict] = None
+    ) -> Dict[str, float]:
         """
-        Calculate dynamic stop loss and take profit levels.
+        Get protection levels for a position.
 
         Args:
             position: Current position details
-            volatility: Current market volatility
+            market_data: Optional market data, uses internal state if not provided
 
         Returns:
-            Tuple of (stop_loss_price, take_profit_price)
+            Dictionary containing protection levels and targets
         """
-        self._market_state['volatility'] = volatility
-        protection = self._risk_manager.calculate_drawdown_protection(
-            position,
-            self._market_state
-        )
-        
-        stop_loss = protection['stop_loss']
-        take_profit = position['entry_price'] * (
-            1 + (position['entry_price'] - stop_loss) / position['entry_price'] * 1.5
-        )
-        
-        return stop_loss, take_profit
+        if market_data is None:
+            market_data = self._market_state
+
+        return self._risk_manager.calculate_protection_levels(position, market_data)
 
     def detect_extreme_events(self, market_data: Dict) -> bool:
         """
@@ -202,9 +218,86 @@ class ImmuneSystem:
         return abs(min(0, total_pnl / total_value)) if total_value else 0
 
     def _assess_counterparty_risk(self, positions: List[Dict]) -> float:
-        """Assess counterparty risk based on position distribution."""
-        # TODO: Implement counterparty risk assessment
-        return 0.0
+        """
+        Assess counterparty risk based on exchange health and position distribution.
+        
+        Args:
+            positions: List of current trading positions
+
+        Returns:
+            Normalized counterparty risk score between 0 and 1
+        """
+        if not positions:
+            return 0.0
+            
+        # Calculate risk per exchange
+        exchange_risks = {}
+        for position in positions:
+            exchange = position.get('exchange', 'unknown')
+            if exchange not in exchange_risks:
+                exchange_risks[exchange] = {
+                    'total_value': 0.0,
+                    'positions': 0,
+                    'health_score': self._get_exchange_health_score(exchange)
+                }
+            
+            position_value = position['size'] * position.get(
+                'current_price',
+                position['entry_price']
+            )
+            exchange_risks[exchange]['total_value'] += position_value
+            exchange_risks[exchange]['positions'] += 1
+        
+        # Calculate total portfolio value
+        total_value = sum(
+            ex['total_value'] for ex in exchange_risks.values()
+        )
+        
+        if total_value == 0:
+            return 0.0
+            
+        # Calculate weighted risk score
+        total_risk = 0.0
+        for ex_risk in exchange_risks.values():
+            # Weight by portfolio percentage and health score
+            weight = ex_risk['total_value'] / total_value
+            concentration_penalty = min(1.0, ex_risk['positions'] / 5)  # Penalize concentration
+            risk_score = (1 - ex_risk['health_score']) * concentration_penalty
+            total_risk += weight * risk_score
+            
+        return min(1.0, total_risk)
+
+    def _get_exchange_health_score(self, exchange: str) -> float:
+        """
+        Get health score for a specific exchange.
+        
+        Args:
+            exchange: Exchange identifier
+
+        Returns:
+            Health score between 0 and 1, where 1 is perfectly healthy
+        """
+        if exchange not in self._exchange_health:
+            return 0.8  # Default score for unknown exchanges
+            
+        health = self._exchange_health[exchange]
+        
+        # Calculate health score based on various metrics
+        uptime = health.get('uptime', 0.95)
+        api_response_time = health.get('api_response_time', 500)  # ms
+        error_rate = health.get('error_rate', 0.05)
+        
+        # Normalize response time (0-1000ms -> 1-0)
+        response_score = max(0, 1 - (api_response_time / 1000))
+        
+        # Calculate final score
+        score = (
+            uptime * 0.4 +
+            response_score * 0.3 +
+            (1 - error_rate) * 0.3
+        )
+        
+        return max(0.0, min(1.0, score))
 
     def _update_market_state(self, market_data: Dict) -> None:
         """Update internal market state with new data."""
