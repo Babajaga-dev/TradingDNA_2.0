@@ -26,12 +26,12 @@ class NervousMenu:
         menu = """
 🧠 Sistema Nervoso
 
-1. Stato Sistema
-2. Metriche Performance
-3. Pattern Attivi
-4. Gestione Stream
-5. Ottimizzazione
-0. Indietro
+1. 🔍 Stato Sistema
+2. 📊 Metriche Performance
+3. 📈 Pattern Attivi
+4. 🔄 Gestione Stream
+5. ⚡ Ottimizzazione
+0. 🔙 Indietro
 
 Seleziona un'opzione: """
         
@@ -84,7 +84,7 @@ Seleziona un'opzione: """
         health_color = "green" if health_score > 0.85 else "yellow" if health_score > 0.7 else "red"
         health_panel = Panel(
             f"Score: [bold {health_color}]{health_score:.2f}[/bold {health_color}]",
-            title="Stato Sistema",
+            title="🏥 Stato Sistema",
             border_style=health_color
         )
         layout["health"].update(health_panel)
@@ -101,10 +101,10 @@ Seleziona un'opzione: """
         else:
             stream_text = "[red]✗ Inattivo[/red]"
         
-        layout["streaming"].update(Panel(stream_text, title="Stato Streaming"))
+        layout["streaming"].update(Panel(stream_text, title="🔄 Stato Streaming"))
         
         # Metrics table
-        metrics_table = Table(title="Metriche Performance")
+        metrics_table = Table(title="📊 Metriche Performance")
         metrics_table.add_column("Metrica", style="cyan")
         metrics_table.add_column("Valore", style="magenta")
         metrics_table.add_column("Range Ottimale", style="green")
@@ -124,7 +124,7 @@ Seleziona un'opzione: """
             f"[cyan]Pattern Recognition:[/cyan] {result['config']['patterns']}",
             f"[cyan]Performance:[/cyan] {result['config']['performance']}"
         ])
-        layout["config"].update(Panel(config_text, title="Configurazione"))
+        layout["config"].update(Panel(config_text, title="⚙️ Configurazione"))
         
         console.print(layout)
     
@@ -136,7 +136,7 @@ Seleziona un'opzione: """
             console.print(f"[red]Errore: {result['message']}[/red]")
             return
         
-        table = Table(title="Metriche Dettagliate")
+        table = Table(title="📊 Metriche Dettagliate")
         table.add_column("Metrica", style="cyan")
         table.add_column("Valore", style="magenta")
         table.add_column("Range Ottimale", style="green")
@@ -164,7 +164,7 @@ Seleziona un'opzione: """
             console.print("[yellow]Nessun pattern attivo al momento[/yellow]")
             return
         
-        table = Table(title="Pattern Attivi")
+        table = Table(title="📈 Pattern Attivi")
         table.add_column("Pattern", style="cyan")
         table.add_column("Confidenza", style="magenta")
         table.add_column("Timeframe", style="yellow")
@@ -181,17 +181,17 @@ Seleziona un'opzione: """
     def _show_stream_menu(self) -> None:
         """Display stream management submenu."""
         menu = """
-1. Avvia Stream
-2. Ferma Stream
-3. Configura Timeframe
-4. Configura Velocità
-5. Lista Pair Disponibili
-0. Indietro
+1. 🟢 Avvia Stream
+2. 🔴 Ferma Stream
+3. ⏱️ Configura Timeframe
+4. ⚡ Configura Velocità
+5. 📋 Lista Pair Disponibili
+0. 🔙 Indietro
 
 Seleziona un'opzione: """
         
         while True:
-            console.print(Panel(menu, title="Gestione Stream", border_style="blue"))
+            console.print(Panel(menu, title="🔄 Gestione Stream", border_style="blue"))
             choice = console.input("Scelta: ")
             
             if choice == "1":
@@ -202,7 +202,7 @@ Seleziona un'opzione: """
                     continue
                 
                 # Show pairs table
-                table = Table(title="Pair Disponibili")
+                table = Table(title="📋 Pair Disponibili")
                 table.add_column("Symbol", style="cyan")
                 for pair in pairs['pairs']:
                     table.add_row(pair)
@@ -237,7 +237,7 @@ Seleziona un'opzione: """
                     continue
                 
                 # Show timeframes table
-                table = Table(title="Timeframe Disponibili")
+                table = Table(title="⏱️ Timeframe Disponibili")
                 table.add_column("Timeframe", style="cyan")
                 for tf in timeframes['timeframes']:
                     table.add_row(tf)
@@ -275,7 +275,7 @@ Seleziona un'opzione: """
                     console.print(f"[red]{pairs['message']}[/red]")
                     continue
                 
-                table = Table(title="Pair Disponibili")
+                table = Table(title="📋 Pair Disponibili")
                 table.add_column("Symbol", style="cyan")
                 for pair in pairs['pairs']:
                     table.add_row(pair)
@@ -288,7 +288,7 @@ Seleziona un'opzione: """
     
     def _optimize_system(self) -> None:
         """Run system optimization."""
-        console.print("[yellow]Avvio ottimizzazione parametri...[/yellow]")
+        console.print("[yellow]⚡ Avvio ottimizzazione parametri...[/yellow]")
         
         result = self.handler.optimize_parameters()
         
