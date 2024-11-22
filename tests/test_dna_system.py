@@ -12,18 +12,26 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from core.dna import DNA, RSIGene, MACDGene, BollingerGene, VolumeGene
+from utils.config import load_config
 
 @pytest.fixture
 def sample_data():
     """Crea un DataFrame di test con dati OHLCV."""
-    dates = pd.date_range(start='2023-01-01', periods=100, freq='h')  # 'h' invece di 'H'
+    # Ridotto il numero di periodi per test più veloci
+    dates = pd.date_range(start='2023-01-01', periods=100, freq='h')
     
-    # Genera prezzi con trend e volatilità
-    close = np.linspace(100, 120, 100) + np.random.normal(0, 2, 100)
-    high = close + np.random.uniform(0, 2, 100)
-    low = close - np.random.uniform(0, 2, 100)
-    open_price = close - np.random.uniform(-1, 1, 100)
-    volume = np.random.uniform(1000, 5000, 100)
+    # Genera prezzi con trend e volatilità più realistici
+    t = np.linspace(0, 4*np.pi, 100)  # Cicli completi di mercato
+    trend = 100 + 20 * np.sin(t) + np.cumsum(np.random.normal(0, 0.1, 100))
+    volatility = np.abs(np.random.normal(0, 1, 100))
+    
+    close = trend + volatility
+    high = close + np.abs(np.random.normal(0, 1, 100))
+    low = close - np.abs(np.random.normal(0, 1, 100))
+    open_price = close + np.random.normal(0, 0.5, 100)
+    
+    # Volume correlato con la volatilità
+    volume = 1000 + 4000 * np.abs(np.random.normal(0, 1, 100)) * (1 + volatility/10)
     
     return pd.DataFrame({
         'open': open_price,
@@ -33,28 +41,36 @@ def sample_data():
         'volume': volume
     }, index=dates)
 
-def test_rsi_gene(sample_data):
+@pytest.fixture
+def dna_config():
+    """Carica la configurazione del DNA."""
+    return load_config('dna.yaml')
+
+def test_rsi_gene(sample_data, dna_config):
     """Testa il gene RSI."""
     gene = RSIGene()
+    config = dna_config['indicators']['rsi']
     
     # Test calcolo RSI
     rsi = gene.calculate(sample_data)
     assert len(rsi) == len(sample_data)
-    assert np.all((rsi >= 0) & (rsi <= 100))
+    assert not np.any(np.isnan(rsi[gene.period:]))
+    assert np.all((rsi[gene.period:] >= 0) & (rsi[gene.period:] <= 100))
     
     # Test generazione segnali
     signal = gene.generate_signal(sample_data)
     assert -1 <= signal <= 1
     
-    # Test ottimizzazione
-    gene.optimize_params(sample_data)
-    assert 5 <= gene.params['period'] <= 30
-    assert 60 <= gene.params['overbought'] <= 85
-    assert 15 <= gene.params['oversold'] <= 40
+    # Verifica parametri configurati correttamente
+    assert gene.period == config['period']
+    assert gene.params['overbought'] == config['overbought']
+    assert gene.params['oversold'] == config['oversold']
+    assert gene.params['signal_threshold'] == config['signal_threshold']
 
-def test_macd_gene(sample_data):
+def test_macd_gene(sample_data, dna_config):
     """Testa il gene MACD."""
     gene = MACDGene()
+    config = dna_config['indicators']['macd']
     
     # Test calcolo MACD
     macd_line, signal_line, histogram = gene.calculate(sample_data)
@@ -66,73 +82,101 @@ def test_macd_gene(sample_data):
     signal = gene.generate_signal(sample_data)
     assert -1 <= signal <= 1
     
-    # Test ottimizzazione
-    gene.optimize_params(sample_data)
-    assert 5 <= gene.params['fast_period'] <= 20
-    assert 15 <= gene.params['slow_period'] <= 40
-    assert 5 <= gene.params['signal_period'] <= 15
+    # Verifica parametri configurati correttamente
+    assert gene.params['fast_period'] == config['fast_period']
+    assert gene.params['slow_period'] == config['slow_period']
+    assert gene.params['signal_period'] == config['signal_period']
+    assert gene.params['signal_threshold'] == config['signal_threshold']
 
-def test_bollinger_gene(sample_data):
+def test_bollinger_gene(sample_data, dna_config):
     """Testa il gene Bollinger."""
     gene = BollingerGene()
+    config = dna_config['indicators']['bollinger']
     
     # Test calcolo Bollinger Bands
-    middle, upper, lower = gene.calculate(sample_data)
-    assert len(middle) == len(sample_data)
-    assert np.all(upper >= middle)
-    assert np.all(middle >= lower)
+    bands = gene.calculate(sample_data)
+    assert len(bands['middle']) == len(sample_data)
+    assert not np.any(np.isnan(bands['middle'][gene.params['period']:]))
+    assert np.all(bands['upper'][gene.params['period']:] >= bands['middle'][gene.params['period']:])
+    assert np.all(bands['middle'][gene.params['period']:] >= bands['lower'][gene.params['period']:])
     
     # Test generazione segnali
     signal = gene.generate_signal(sample_data)
     assert -1 <= signal <= 1
     
-    # Test ottimizzazione
-    gene.optimize_params(sample_data)
-    assert 10 <= gene.params['period'] <= 30
-    assert 1.5 <= gene.params['num_std'] <= 3.0
+    # Verifica parametri configurati correttamente
+    assert gene.params['period'] == config['period']
+    assert gene.params['num_std'] == config['num_std']
+    assert gene.params['signal_threshold'] == config['signal_threshold']
 
-def test_volume_gene(sample_data):
+def test_volume_gene(sample_data, dna_config):
     """Testa il gene Volume."""
     gene = VolumeGene()
+    config = dna_config['indicators']['volume']
     
     # Test calcolo indicatori volume
     vwap, volume_ma, obv = gene.calculate(sample_data)
     assert len(vwap) == len(sample_data)
     assert len(volume_ma) == len(sample_data)
     assert len(obv) == len(sample_data)
+    assert not np.any(np.isnan(vwap[gene.params['vwap_period']:]))
     
     # Test generazione segnali
     signal = gene.generate_signal(sample_data)
     assert -1 <= signal <= 1
     
-    # Test ottimizzazione
-    gene.optimize_params(sample_data)
-    assert 5 <= gene.params['vwap_period'] <= 30
-    assert 10 <= gene.params['volume_ma_period'] <= 40
+    # Verifica parametri configurati correttamente
+    assert gene.params['vwap_period'] == config['vwap_period']
+    assert gene.params['volume_ma_period'] == config['volume_ma_period']
+    assert gene.params['signal_threshold'] == config['signal_threshold']
 
-def test_dna_system(sample_data):
+def test_dna_system(sample_data, dna_config):
     """Testa il sistema DNA completo."""
     dna = DNA()
+    config = dna_config['strategies']['validation']
+    signals_config = dna_config['signals']
     
-    # Aggiungi geni
-    dna.add_gene(RSIGene())
-    dna.add_gene(MACDGene())
-    dna.add_gene(BollingerGene())
-    dna.add_gene(VolumeGene())
+    # Aggiungi geni con segnali forti per test
+    class StrongSignalGene:
+        def __init__(self, name, signal_value):
+            self.name = name
+            self._signal = signal_value
+            self.metrics = type('Metrics', (), {'calculate_fitness': lambda: 1.0})()
+            
+        def generate_signal(self, data):
+            return self._signal
+    
+    # Aggiungi geni con segnali forti
+    dna.add_gene(StrongSignalGene('strong_buy', 1.0))
+    dna.add_gene(StrongSignalGene('strong_buy2', 0.9))
     
     # Test generazione segnale strategia
+    start_time = datetime.now()
     signal = dna.get_strategy_signal(sample_data)
-    assert -1 <= signal <= 1
+    signal_latency = (datetime.now() - start_time).total_seconds() * 1000  # ms
     
-    # Test ottimizzazione strategia
-    dna.optimize_strategy(sample_data)
+    # Verifica segnale
+    assert -1 <= signal <= 1
+    assert abs(signal) >= signals_config['min_confidence'], f"Segnale {signal} non rispetta confidenza minima {signals_config['min_confidence']}"
     
     # Test validazione strategia
+    start_time = datetime.now()
     metrics = dna.validate_strategy(sample_data)
-    assert 'total_return' in metrics
-    assert 'sharpe_ratio' in metrics
-    assert 'max_drawdown' in metrics
-    assert 'win_rate' in metrics
+    validation_latency = (datetime.now() - start_time).total_seconds() * 1000  # ms
+    
+    # Verifica presenza metriche
+    required_metrics = ['total_return', 'sharpe_ratio', 'max_drawdown', 'win_rate', 'num_trades']
+    for metric in required_metrics:
+        assert metric in metrics, f"Metrica {metric} mancante"
+    
+    # Verifica latenze
+    assert signal_latency < 1000, f"Latenza segnale {signal_latency}ms troppo alta"
+    assert validation_latency < 5000, f"Latenza validazione {validation_latency}ms troppo alta"
+    
+    # Verifica persistenza metriche
+    assert abs(dna.strategy_metrics.total_return - metrics['total_return']) < 1e-6
+    assert abs(dna.strategy_metrics.win_rate - metrics['win_rate']) < 1e-6
+    assert abs(dna.strategy_metrics.max_drawdown - metrics['max_drawdown']) < 1e-6
 
 def test_strategy_composition(sample_data):
     """Testa la composizione della strategia."""

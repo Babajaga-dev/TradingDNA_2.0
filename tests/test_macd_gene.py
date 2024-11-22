@@ -16,27 +16,33 @@ class TestMACDGene(unittest.TestCase):
         """Setup comune per tutti i test."""
         self.gene = MACDGene()
         
-        # Dati di test - trend rialzista
+        # Dati di test - trend rialzista graduale con più punti
         self.test_data_up = pd.DataFrame({
             'close': [
-                10.0, 10.2, 10.4, 10.6, 10.8,
-                11.0, 11.2, 11.4, 11.6, 11.8,
-                12.0, 12.2, 12.4, 12.6, 12.8,
-                13.0, 13.2, 13.4, 13.6, 13.8,
-                14.0, 14.2, 14.4, 14.6, 14.8,
-                15.0, 15.2, 15.4, 15.6, 15.8
+                10.0, 10.0, 10.0, 10.0, 10.0,  # Base stabile
+                10.0, 10.0, 10.0, 10.0, 10.0,
+                10.0, 10.0, 10.0, 10.0, 10.0,
+                10.0, 10.0, 10.0, 10.0, 10.0,
+                10.0, 10.0, 10.0, 10.0, 10.0,  # Primi 25 valori stabili
+                10.2, 10.4, 10.6, 10.8, 11.0,  # Inizio movimento
+                11.3, 11.6, 11.9, 12.2, 12.5,  # Accelerazione
+                12.9, 13.3, 13.7, 14.1, 14.5,  # Forte movimento
+                15.0, 15.5, 16.0, 16.5, 17.0   # Movimento finale
             ]
         })
         
-        # Dati di test - trend ribassista
+        # Dati di test - trend ribassista graduale con più punti
         self.test_data_down = pd.DataFrame({
             'close': [
-                10.0, 9.8, 9.6, 9.4, 9.2,
-                9.0, 8.8, 8.6, 8.4, 8.2,
-                8.0, 7.8, 7.6, 7.4, 7.2,
-                7.0, 6.8, 6.6, 6.4, 6.2,
-                6.0, 5.8, 5.6, 5.4, 5.2,
-                5.0, 4.8, 4.6, 4.4, 4.2
+                20.0, 20.0, 20.0, 20.0, 20.0,  # Base stabile
+                20.0, 20.0, 20.0, 20.0, 20.0,
+                20.0, 20.0, 20.0, 20.0, 20.0,
+                20.0, 20.0, 20.0, 20.0, 20.0,
+                20.0, 20.0, 20.0, 20.0, 20.0,  # Primi 25 valori stabili
+                19.8, 19.6, 19.4, 19.2, 19.0,  # Inizio movimento
+                18.7, 18.4, 18.1, 17.8, 17.5,  # Accelerazione
+                17.1, 16.7, 16.3, 15.9, 15.5,  # Forte movimento
+                15.0, 14.5, 14.0, 13.5, 13.0   # Movimento finale
             ]
         })
         
@@ -46,31 +52,31 @@ class TestMACDGene(unittest.TestCase):
         self.assertEqual(self.gene.fast_period, 12)
         self.assertEqual(self.gene.slow_period, 26)
         self.assertEqual(self.gene.signal_period, 9)
-        self.assertEqual(self.gene.signal_threshold, 0.0)
+        self.assertEqual(self.gene.signal_threshold, 0.6)
         
     def test_calculate_basic(self) -> None:
         """Verifica calcolo base MACD."""
-        result = self.gene.calculate(self.test_data_up)
+        macd_line, signal_line, histogram = self.gene.calculate(self.test_data_up)
         
-        # Verifica presenza di tutte le componenti
-        self.assertIn('macd', result)
-        self.assertIn('signal', result)
-        self.assertIn('histogram', result)
+        # Verifica che i risultati siano array numpy
+        self.assertIsInstance(macd_line, np.ndarray)
+        self.assertIsInstance(signal_line, np.ndarray)
+        self.assertIsInstance(histogram, np.ndarray)
         
         # Verifica dimensioni output
-        self.assertEqual(len(result['macd']), len(self.test_data_up))
-        self.assertEqual(len(result['signal']), len(self.test_data_up))
-        self.assertEqual(len(result['histogram']), len(self.test_data_up))
+        self.assertEqual(len(macd_line), len(self.test_data_up))
+        self.assertEqual(len(signal_line), len(self.test_data_up))
+        self.assertEqual(len(histogram), len(self.test_data_up))
         
         # Verifica che l'istogramma sia la differenza tra MACD e signal
         np.testing.assert_array_almost_equal(
-            result['histogram'],
-            result['macd'] - result['signal']
+            histogram,
+            macd_line - signal_line
         )
         
         # Verifica valori finali (usando indici positivi)
-        self.assertTrue(np.all(~np.isnan(result['macd'][self.gene.slow_period:])))
-        self.assertTrue(np.all(~np.isnan(result['signal'][self.gene.slow_period + self.gene.signal_period:])))
+        self.assertTrue(np.all(~np.isnan(macd_line[self.gene.slow_period:])))
+        self.assertTrue(np.all(~np.isnan(signal_line[self.gene.slow_period + self.gene.signal_period:])))
         
     def test_calculate_missing_column(self) -> None:
         """Verifica gestione colonna mancante."""
@@ -81,13 +87,13 @@ class TestMACDGene(unittest.TestCase):
             
     def test_generate_signal_bullish(self) -> None:
         """Verifica segnale rialzista."""
-        # Usa i dati rialzisti
+        # Usa i dati con trend rialzista graduale
         signal = self.gene.generate_signal(self.test_data_up)
         self.assertEqual(signal, 1)
             
     def test_generate_signal_bearish(self) -> None:
         """Verifica segnale ribassista."""
-        # Usa i dati ribassisti
+        # Usa i dati con trend ribassista graduale
         signal = self.gene.generate_signal(self.test_data_down)
         self.assertEqual(signal, -1)
             
@@ -95,7 +101,7 @@ class TestMACDGene(unittest.TestCase):
         """Verifica segnale neutrale."""
         # Crea dati che generano MACD neutrale
         neutral_data = pd.DataFrame({
-            'close': [10.0] * 30  # Prezzi costanti = MACD neutrale
+            'close': [10.0] * 45  # Prezzi costanti = MACD neutrale
         })
         signal = self.gene.generate_signal(neutral_data)
         self.assertEqual(signal, 0)

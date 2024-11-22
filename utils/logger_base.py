@@ -4,6 +4,7 @@ import yaml
 from pathlib import Path
 from rich.console import Console
 from rich.theme import Theme
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeRemainingColumn
 
 # Tema Rich
 custom_theme = Theme({
@@ -49,6 +50,20 @@ class ComponentLogger:
         
     def critical(self, message: str):
         self.logger.critical(self._format_message(message))
+
+def get_progress_logger():
+    """Ottiene un progress logger configurato con Rich.
+    
+    Returns:
+        Progress: Un context manager per tracciare il progresso delle operazioni
+    """
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TimeRemainingColumn()
+    )
 
 def setup_logging(config_file: str = None):
     """Configura il sistema di logging"""

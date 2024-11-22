@@ -34,35 +34,52 @@ class RSIGene(Gene):
             np.ndarray: Array con i valori RSI
             
         Raises:
-            ValueError: Se manca la colonna 'close' nel DataFrame
+            ValueError: Se manca la colonna 'close' nel DataFrame o se non ci sono abbastanza dati
         """
         if 'close' not in data.columns:
             logger.error("Colonna 'close' mancante nel DataFrame")
             raise ValueError("DataFrame deve contenere la colonna 'close'")
             
-        close_prices = data['close'].values
-        deltas = np.diff(close_prices)
-        seed = deltas[:self.period+1]
-        up = seed[seed >= 0].sum()/self.period
-        down = -seed[seed < 0].sum()/self.period
-        rs = up/down if down != 0 else 0
-        rsi = np.zeros_like(close_prices)
-        rsi[self.period] = 100 - 100/(1+rs)
-
-        for i in range(self.period+1, len(close_prices)):
-            delta = deltas[i-1]
-            if delta > 0:
-                upval = delta
-                downval = 0
-            else:
-                upval = 0
-                downval = -delta
-                
-            up = (up*(self.period-1) + upval)/self.period
-            down = (down*(self.period-1) + downval)/self.period
-            rs = up/down if down != 0 else 0
-            rsi[i] = 100 - 100/(1+rs)
+        if len(data) < self.period + 1:
+            logger.error(f"Dati insufficienti per calcolare RSI. Richiesti almeno {self.period + 1} punti")
+            raise ValueError(f"Sono necessari almeno {self.period + 1} punti per calcolare RSI")
             
+        # Calcola le variazioni di prezzo
+        prices = data['close'].values
+        changes = np.diff(prices)
+        
+        # Separa gains e losses
+        gains = np.maximum(changes, 0)
+        losses = -np.minimum(changes, 0)
+        
+        # Inizializza array RSI
+        rsi = np.full_like(prices, np.nan)
+        
+        # Calcola la prima media con controllo per divisione per zero
+        avg_gain = np.mean(gains[:self.period]) if len(gains) >= self.period else 0
+        avg_loss = np.mean(losses[:self.period]) if len(losses) >= self.period else 0
+        
+        # Gestione caso speciale per avg_loss = 0
+        if avg_loss == 0:
+            rsi[self.period] = 100 if avg_gain > 0 else 50
+        else:
+            rs = avg_gain / avg_loss
+            rsi[self.period] = 100 - (100 / (1 + rs))
+            
+        # Calcola i successivi RSI
+        for i in range(self.period + 1, len(prices)):
+            avg_gain = (avg_gain * (self.period - 1) + gains[i-1]) / self.period
+            avg_loss = (avg_loss * (self.period - 1) + losses[i-1]) / self.period
+            
+            if avg_loss == 0:
+                rsi[i] = 100 if avg_gain > 0 else 50
+            else:
+                rs = avg_gain / avg_loss
+                rsi[i] = 100 - (100 / (1 + rs))
+                
+        # Riempi i primi valori con la media mobile
+        rsi[:self.period] = np.nanmean(rsi[self.period:self.period*2])
+        
         logger.debug(f"Calcolato RSI, ultimi valori: {rsi[-5:]}")
         return rsi
         
@@ -76,16 +93,24 @@ class RSIGene(Gene):
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
         try:
+            if len(data) < self.period + 1:
+                logger.warning("Dati insufficienti per generare segnale RSI")
+                return 0
+                
             rsi = self.calculate(data)
             current_rsi = rsi[-1]
             
-            if current_rsi < self.oversold and current_rsi < rsi[-2]:
+            if np.isnan(current_rsi):
+                logger.warning("RSI corrente è NaN, nessun segnale generato")
+                return 0
+            
+            if current_rsi < self.oversold:
                 confidence = (self.oversold - current_rsi)/(self.oversold)
                 signal = 1 if confidence > self.signal_threshold else 0
                 logger.info(f"RSI oversold ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")
                 return signal
                 
-            elif current_rsi > self.overbought and current_rsi > rsi[-2]:
+            elif current_rsi > self.overbought:
                 confidence = (current_rsi - self.overbought)/(100 - self.overbought)
                 signal = -1 if confidence > self.signal_threshold else 0
                 logger.info(f"RSI overbought ({current_rsi:.2f}), confidence: {confidence:.2f}, signal: {signal}")

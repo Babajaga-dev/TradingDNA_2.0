@@ -86,4 +86,9 @@ def handle_init(args):
 
 def handle_dna(args):
     """Gestisce il comando dna"""
-    handle_dna_command(args)
+    try:
+        handle_dna_command(args)
+    except Exception as e:
+        logger.error(f"Errore comando DNA: {str(e)}")
+        print_error(f"Errore comando DNA: {str(e)}")
+        sys.exit(1)

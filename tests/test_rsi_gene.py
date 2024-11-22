@@ -16,23 +16,23 @@ class TestRSIGene(unittest.TestCase):
         """Setup comune per tutti i test."""
         self.gene = RSIGene()
         
-        # Dati di test - trend rialzista per RSI alto
+        # Dati di test - trend rialzista più forte per RSI alto
         self.test_data_up = pd.DataFrame({
             'close': [
-                10.0, 10.2, 10.4, 10.6, 10.8,
-                11.0, 11.2, 11.4, 11.6, 11.8,
-                12.0, 12.2, 12.4, 12.6, 12.8,
-                13.0, 13.2, 13.4, 13.6, 13.8
+                10.0, 10.5, 11.0, 11.8, 12.5,
+                13.2, 14.0, 15.0, 16.2, 17.5,
+                18.8, 20.0, 21.5, 23.0, 24.8,
+                26.5, 28.2, 30.0, 32.0, 34.0
             ]
         })
         
-        # Dati di test - trend ribassista per RSI basso
+        # Dati di test - trend ribassista più forte per RSI basso
         self.test_data_down = pd.DataFrame({
             'close': [
-                10.0, 9.8, 9.6, 9.4, 9.2,
-                9.0, 8.8, 8.6, 8.4, 8.2,
-                8.0, 7.8, 7.6, 7.4, 7.2,
-                7.0, 6.8, 6.6, 6.4, 6.2
+                10.0, 9.5, 9.0, 8.2, 7.5,
+                6.8, 6.0, 5.0, 4.2, 3.5,
+                2.8, 2.0, 1.5, 1.2, 1.0,
+                0.8, 0.6, 0.5, 0.4, 0.3
             ]
         })
         

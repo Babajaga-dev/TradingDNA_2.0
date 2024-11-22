@@ -7,14 +7,11 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 from utils.logger_base import get_component_logger
+from utils.config import load_config
 from core.dna.gene import Gene
 
 # Setup logger
 logger = get_component_logger('VolumeGene')
-
-def safe_divide(a, b, default=0):
-    """Divisione sicura per evitare divisioni per zero."""
-    return a / b if b != 0 else default
 
 class VolumeGene(Gene):
     """Gene per l'analisi del Volume."""
@@ -22,11 +19,17 @@ class VolumeGene(Gene):
     def __init__(self) -> None:
         """Inizializza il gene Volume."""
         super().__init__("volume")
-        self.vwap_period: int = self.params.get('vwap_period', 14)
-        self.volume_ma_period: int = self.params.get('volume_ma_period', 20)
-        self.price_volume_ma_period: int = self.params.get('price_volume_ma_period', 30)
-        self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
-        logger.info(f"Inizializzato Volume con periodi VWAP:{self.vwap_period}, Vol MA:{self.volume_ma_period}")
+        
+        # Carica configurazione
+        config = load_config('dna.yaml')
+        volume_config = config['indicators']['volume']
+        
+        self.params = {
+            'vwap_period': volume_config['vwap_period'],
+            'volume_ma_period': volume_config['volume_ma_period'],
+            'signal_threshold': volume_config['signal_threshold']
+        }
+        logger.info(f"Inizializzato Volume con parametri: {self.params}")
         
     def calculate(self, data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Calcola gli indicatori di volume.
@@ -35,71 +38,55 @@ class VolumeGene(Gene):
             data: DataFrame con colonne OHLCV
             
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: 
                 - VWAP (Volume Weighted Average Price)
-                - Volume MA
+                - Volume MA (Media mobile del volume)
                 - OBV (On Balance Volume)
                 
         Raises:
-            ValueError: Se mancano colonne necessarie nel DataFrame
+            ValueError: Se mancano le colonne OHLCV o non ci sono abbastanza dati
         """
         required_columns = ['open', 'high', 'low', 'close', 'volume']
         if not all(col in data.columns for col in required_columns):
             logger.error("Colonne OHLCV mancanti nel DataFrame")
             raise ValueError("DataFrame deve contenere le colonne OHLCV")
             
+        if len(data) < max(self.params['vwap_period'], self.params['volume_ma_period']):
+            logger.error(f"Dati insufficienti per calcolare gli indicatori di volume")
+            raise ValueError(f"Sono necessari almeno {max(self.params['vwap_period'], self.params['volume_ma_period'])} punti")
+            
         # Calcola VWAP
         typical_price = (data['high'] + data['low'] + data['close']) / 3
-        vwap = np.zeros(len(data))
+        cumulative_tp_vol = typical_price * data['volume']
+        cumulative_vol = data['volume']
         
-        for i in range(self.vwap_period-1, len(data)):
-            price_vol = typical_price.iloc[i-self.vwap_period+1:i+1] * data['volume'].iloc[i-self.vwap_period+1:i+1]
-            volume = data['volume'].iloc[i-self.vwap_period+1:i+1]
-            vwap[i] = np.sum(price_vol) / np.sum(volume)
-            
-        # Calcola Volume MA
-        volume_ma = np.zeros(len(data))
-        for i in range(self.volume_ma_period-1, len(data)):
-            volume_ma[i] = np.mean(data['volume'].iloc[i-self.volume_ma_period+1:i+1])
+        vwap_values = np.zeros(len(data))
+        for i in range(len(data)):
+            start_idx = max(0, i - self.params['vwap_period'] + 1)
+            vwap_values[i] = (cumulative_tp_vol.iloc[start_idx:i+1].sum() / 
+                            cumulative_vol.iloc[start_idx:i+1].sum())
+                
+        # Calcola Volume MA usando rolling window
+        volume_ma = data['volume'].rolling(window=self.params['volume_ma_period'], min_periods=1).mean()
             
         # Calcola OBV (On Balance Volume)
-        close_diff = data['close'].diff()
-        obv = np.zeros(len(data))
+        price_change = data['close'].diff()
+        volume = data['volume'].astype(float)  # Converti volume in float
+        
+        # Calcola OBV usando numpy per evitare warning pandas
+        obv_values = np.zeros(len(data))
+        obv_values[0] = volume.iloc[0]
         
         for i in range(1, len(data)):
-            if close_diff.iloc[i] > 0:
-                obv[i] = obv[i-1] + data['volume'].iloc[i]
-            elif close_diff.iloc[i] < 0:
-                obv[i] = obv[i-1] - data['volume'].iloc[i]
+            if price_change.iloc[i] > 0:
+                obv_values[i] = obv_values[i-1] + volume.iloc[i]
+            elif price_change.iloc[i] < 0:
+                obv_values[i] = obv_values[i-1] - volume.iloc[i]
             else:
-                obv[i] = obv[i-1]
-                
-        logger.debug(f"Calcolati indicatori volume, ultimi VWAP: {vwap[-5:]}")
-        return vwap, volume_ma, obv
+                obv_values[i] = obv_values[i-1]
         
-    def _calculate_price_volume_trend(self, data: pd.DataFrame) -> float:
-        """Calcola il trend prezzo-volume.
-        
-        Args:
-            data: DataFrame con dati OHLCV
-            
-        Returns:
-            float: Indicatore di trend (-1 a 1)
-        """
-        period = self.price_volume_ma_period
-        if len(data) < period:
-            return 0
-            
-        # Calcola variazioni percentuali
-        price_changes = data['close'].pct_change().iloc[-period:]
-        volume_changes = data['volume'].pct_change().iloc[-period:]
-        
-        # Calcola correlazione
-        try:
-            correlation = np.corrcoef(price_changes, volume_changes)[0,1]
-            return correlation if not np.isnan(correlation) else 0
-        except Exception:
-            return 0
+        logger.debug(f"Calcolati indicatori volume, ultimi valori VWAP: {vwap_values[-5:]}")
+        return vwap_values, volume_ma.to_numpy(), obv_values
         
     def generate_signal(self, data: pd.DataFrame) -> float:
         """Genera segnale di trading basato sul volume.
@@ -111,54 +98,89 @@ class VolumeGene(Gene):
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
         try:
+            if len(data) < max(self.params['vwap_period'], self.params['volume_ma_period']):
+                logger.warning("Dati insufficienti per generare segnale volume")
+                return 0.0
+                
             vwap, volume_ma, obv = self.calculate(data)
             
-            current_price = data['close'].iloc[-1]
+            # Analisi VWAP e Volume
+            price = data['close'].iloc[-1]
             current_volume = data['volume'].iloc[-1]
             
-            # Analisi trend prezzo-volume
-            pv_trend = self._calculate_price_volume_trend(data)
+            # Calcola la forza del segnale
+            price_distance = abs(price - vwap[-1]) / vwap[-1]
+            volume_strength = (current_volume - volume_ma[-1]) / volume_ma[-1]
             
-            # Volume spike analysis con divisione sicura
-            volume_ratio = safe_divide(current_volume, volume_ma[-1], default=1)
+            # Normalizza la forza del segnale tra 0 e 1
+            signal_strength = min(1.0, (price_distance + volume_strength) / 2)
             
-            # VWAP analysis con divisione sicura
-            vwap_ratio = safe_divide(current_price, vwap[-1], default=1)
+            # Applica threshold
+            if signal_strength < self.params['signal_threshold']:
+                logger.debug("Segnale sotto threshold")
+                return 0.0
             
-            # OBV trend
-            obv_trend = safe_divide(obv[-1] - obv[-2], abs(obv[-2]), default=0)
-            
-            # Segnali di trading
-            if volume_ratio > 2.0:  # Volume spike significativo
-                if current_price > vwap[-1] and pv_trend > 0:  # Conferma rialzista
-                    confidence = min(volume_ratio/4 + abs(pv_trend), 1.0)
-                    signal = 1 if confidence > self.signal_threshold else 0
-                    logger.info(f"Volume spike rialzista, confidence: {confidence:.2f}, signal: {signal}")
-                    return signal
-                    
-                elif current_price < vwap[-1] and pv_trend < 0:  # Conferma ribassista
-                    confidence = min(volume_ratio/4 + abs(pv_trend), 1.0)
-                    signal = -1 if confidence > self.signal_threshold else 0
-                    logger.info(f"Volume spike ribassista, confidence: {confidence:.2f}, signal: {signal}")
-                    return signal
-                    
-            # Segnali di momentum basati su OBV
-            elif abs(obv_trend) > 0.02:  # Movimento significativo OBV
-                if obv_trend > 0 and vwap_ratio > 1:
-                    confidence = min(abs(obv_trend) * 20, 1.0)
-                    if confidence > self.signal_threshold:
-                        logger.info(f"OBV momentum rialzista, confidence: {confidence:.2f}")
-                        return 0.5
-                        
-                elif obv_trend < 0 and vwap_ratio < 1:
-                    confidence = min(abs(obv_trend) * 20, 1.0)
-                    if confidence > self.signal_threshold:
-                        logger.info(f"OBV momentum ribassista, confidence: {confidence:.2f}")
-                        return -0.5
-            
-            logger.debug(f"Volume neutrale, ratio: {volume_ratio:.2f}, PV trend: {pv_trend:.2f}")
-            return 0
+            if price > vwap[-1] and current_volume > volume_ma[-1]:
+                logger.info(f"Segnale rialzista: prezzo sopra VWAP con volume alto")
+                return signal_strength
+            elif price < vwap[-1] and current_volume > volume_ma[-1]:
+                logger.info(f"Segnale ribassista: prezzo sotto VWAP con volume alto")
+                return -signal_strength
+                
+            logger.debug("Volume neutrale")
+            return 0.0
             
         except Exception as e:
             logger.error(f"Errore nel calcolo del segnale Volume: {str(e)}")
-            return 0
+            return 0.0
+            
+    def optimize_params(self, data: pd.DataFrame) -> None:
+        """Ottimizza i parametri del gene Volume.
+        
+        Args:
+            data: DataFrame con dati OHLCV
+        """
+        # Carica range parametri da config
+        config = load_config('dna.yaml')
+        opt_config = config['optimization']['volume']
+        
+        vwap_range = opt_config['vwap_period']
+        volume_ma_range = opt_config['volume_ma_period']
+        threshold_range = opt_config['signal_threshold']
+        
+        best_sharpe = -np.inf
+        best_params = self.params.copy()
+        
+        # Calcola returns una volta sola
+        returns = np.diff(data['close'])
+        
+        for vwap_p in range(vwap_range[0], vwap_range[1], 2):
+            for vol_p in range(volume_ma_range[0], volume_ma_range[1], 2):
+                for threshold in np.arange(threshold_range[0], threshold_range[1], 0.1):
+                    self.params['vwap_period'] = vwap_p
+                    self.params['volume_ma_period'] = vol_p
+                    self.params['signal_threshold'] = threshold
+                    
+                    try:
+                        # Genera segnali per l'intero dataset
+                        signals = np.zeros(len(data))
+                        for i in range(max(vwap_p, vol_p), len(data)):
+                            signals[i] = self.generate_signal(data.iloc[:i+1])
+                        
+                        # Calcola metriche usando i segnali shiftati
+                        strategy_returns = returns * signals[:-1]  # Allinea i segnali con i returns
+                        if len(strategy_returns) > 0 and np.std(strategy_returns) > 0:
+                            sharpe = np.mean(strategy_returns) / np.std(strategy_returns)
+                        else:
+                            sharpe = -np.inf
+                        
+                        if sharpe > best_sharpe:
+                            best_sharpe = sharpe
+                            best_params = self.params.copy()
+                            
+                    except Exception as e:
+                        logger.error(f"Errore durante l'ottimizzazione: {str(e)}")
+                        continue
+        
+        self.params = best_params
+        logger.info(f"Parametri ottimizzati: {self.params}")

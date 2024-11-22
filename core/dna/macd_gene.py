@@ -24,22 +24,30 @@ class MACDGene(Gene):
         self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
         logger.info(f"Inizializzato MACD con periodi {self.fast_period}/{self.slow_period}/{self.signal_period}")
         
-    def _ema(self, data: np.ndarray, period: int) -> np.ndarray:
+    def _ema(self, data: np.ndarray, period: int, start_index: int = 0) -> np.ndarray:
         """Calcola l'EMA (Exponential Moving Average).
         
         Args:
             data: Array di prezzi
             period: Periodo per il calcolo dell'EMA
+            start_index: Indice da cui iniziare il calcolo dell'EMA
             
         Returns:
             np.ndarray: Array con i valori EMA
         """
+        if len(data) < period:
+            return np.full_like(data, np.nan)
+            
         alpha = 2 / (period + 1)
-        ema = np.zeros_like(data)
-        ema[period-1] = np.mean(data[:period])
+        ema = np.full_like(data, np.nan)
         
-        for i in range(period, len(data)):
-            ema[i] = data[i] * alpha + ema[i-1] * (1 - alpha)
+        # Calcola SMA iniziale
+        valid_start = start_index + period - 1
+        ema[valid_start] = np.mean(data[start_index:valid_start + 1])
+        
+        # Calcola EMA
+        for i in range(valid_start + 1, len(data)):
+            ema[i] = (data[i] * alpha) + (ema[i-1] * (1 - alpha))
             
         return ema
         
@@ -56,11 +64,16 @@ class MACDGene(Gene):
                 - Histogram (MACD - Signal)
                 
         Raises:
-            ValueError: Se manca la colonna 'close' nel DataFrame
+            ValueError: Se manca la colonna 'close' nel DataFrame o non ci sono abbastanza dati
         """
         if 'close' not in data.columns:
             logger.error("Colonna 'close' mancante nel DataFrame")
             raise ValueError("DataFrame deve contenere la colonna 'close'")
+            
+        min_periods = max(self.fast_period, self.slow_period) + self.signal_period
+        if len(data) < min_periods:
+            logger.error(f"Dati insufficienti per calcolare MACD. Richiesti almeno {min_periods} punti")
+            raise ValueError(f"Sono necessari almeno {min_periods} punti per calcolare MACD")
             
         close_prices = data['close'].values
         
@@ -69,16 +82,49 @@ class MACDGene(Gene):
         slow_ema = self._ema(close_prices, self.slow_period)
         
         # Calcola MACD line
-        macd_line = fast_ema - slow_ema
+        macd_line = np.full_like(close_prices, np.nan)
+        valid_macd_start = self.slow_period - 1
+        macd_line[valid_macd_start:] = fast_ema[valid_macd_start:] - slow_ema[valid_macd_start:]
         
-        # Calcola Signal line
-        signal_line = self._ema(macd_line, self.signal_period)
+        # Calcola Signal line partendo dal punto in cui MACD è valido
+        signal_line = self._ema(macd_line, self.signal_period, start_index=valid_macd_start)
         
         # Calcola Histogram
         histogram = macd_line - signal_line
         
         logger.debug(f"Calcolato MACD, ultimi valori: {macd_line[-5:]}")
         return macd_line, signal_line, histogram
+        
+    def _calculate_trend_strength(self, values: np.ndarray) -> float:
+        """Calcola la forza del trend basata sulla sequenza di valori.
+        
+        Args:
+            values: Array di valori da analizzare
+            
+        Returns:
+            float: Forza del trend (positiva=rialzista, negativa=ribassista)
+        """
+        if len(values) < 2:
+            return 0.0
+            
+        # Rimuovi NaN
+        valid_values = values[~np.isnan(values)]
+        if len(valid_values) < 2:
+            return 0.0
+            
+        # Calcola le differenze consecutive
+        diffs = np.diff(valid_values)
+        
+        # Calcola la media delle differenze
+        avg_diff = np.mean(diffs)
+        
+        # Calcola la consistenza del trend (quante differenze hanno lo stesso segno)
+        consistency = np.sum(np.sign(diffs) == np.sign(avg_diff)) / len(diffs)
+        
+        # Combina la media delle differenze con la consistenza
+        strength = avg_diff * consistency
+        
+        return strength
         
     def generate_signal(self, data: pd.DataFrame) -> float:
         """Genera segnale di trading basato su MACD.
@@ -90,42 +136,53 @@ class MACDGene(Gene):
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
         try:
+            min_periods = max(self.fast_period, self.slow_period, self.signal_period)
+            if len(data) < min_periods + 10:  # +10 per l'analisi del trend
+                logger.warning(f"Dati insufficienti per generare segnale MACD")
+                return 0
+                
             macd_line, signal_line, histogram = self.calculate(data)
             
-            # Prendi gli ultimi due valori per il confronto
-            curr_hist = histogram[-1]
-            prev_hist = histogram[-2]
-            
-            # Calcola la forza del segnale basata sull'ampiezza dell'istogramma
-            # e il cambio di direzione
-            if curr_hist > 0 and prev_hist < 0:  # Crossover bullish
-                strength = abs(curr_hist) / (abs(macd_line[-1]) + 1e-6)
-                confidence = min(strength * 1.5, 1.0)  # Aumenta la confidenza ma limita a 1
-                signal = 1 if confidence > self.signal_threshold else 0
-                logger.info(f"MACD crossover bullish, confidence: {confidence:.2f}, signal: {signal}")
-                return signal
+            # Verifica che ci siano abbastanza dati validi
+            valid_data = ~np.isnan(macd_line) & ~np.isnan(signal_line) & ~np.isnan(histogram)
+            if np.sum(valid_data) < 10:
+                logger.warning("Dati validi insufficienti per l'analisi del trend")
+                return 0
                 
-            elif curr_hist < 0 and prev_hist > 0:  # Crossover bearish
-                strength = abs(curr_hist) / (abs(macd_line[-1]) + 1e-6)
-                confidence = min(strength * 1.5, 1.0)
-                signal = -1 if confidence > self.signal_threshold else 0
-                logger.info(f"MACD crossover bearish, confidence: {confidence:.2f}, signal: {signal}")
-                return signal
-                
-            # Divergenze
-            elif curr_hist > 0 and curr_hist > prev_hist:  # Momentum bullish
-                confidence = min(curr_hist / (abs(macd_line[-1]) + 1e-6), 1.0)
-                if confidence > self.signal_threshold:
-                    logger.info(f"MACD momentum bullish, confidence: {confidence:.2f}")
-                    return 0.5  # Segnale più debole per momentum
-                    
-            elif curr_hist < 0 and curr_hist < prev_hist:  # Momentum bearish
-                confidence = min(abs(curr_hist) / (abs(macd_line[-1]) + 1e-6), 1.0)
-                if confidence > self.signal_threshold:
-                    logger.info(f"MACD momentum bearish, confidence: {confidence:.2f}")
-                    return -0.5  # Segnale più debole per momentum
+            # Prendi gli ultimi 10 valori validi
+            last_macd = macd_line[valid_data][-10:]
+            last_signal = signal_line[valid_data][-10:]
+            last_hist = histogram[valid_data][-10:]
+            last_prices = data['close'].values[valid_data][-10:]
             
-            logger.debug(f"MACD neutrale, nessun segnale")
+            # Calcola la forza dei trend
+            macd_strength = self._calculate_trend_strength(last_macd)
+            price_strength = self._calculate_trend_strength(last_prices)
+            hist_strength = self._calculate_trend_strength(last_hist)
+            
+            # Log dei valori per debug
+            logger.debug(f"MACD strength: {macd_strength:.4f}")
+            logger.debug(f"Price strength: {price_strength:.4f}")
+            logger.debug(f"Histogram strength: {hist_strength:.4f}")
+            
+            # Calcola la forza complessiva del trend
+            total_strength = (macd_strength + price_strength + hist_strength) / 3
+            
+            # Verifica trend rialzista
+            if (total_strength > 0 and 
+                last_macd[-1] > last_signal[-1] and
+                last_hist[-1] > 0):
+                logger.info(f"Trend rialzista rilevato, strength: {total_strength:.4f}")
+                return 1
+                
+            # Verifica trend ribassista
+            elif (total_strength < 0 and 
+                  last_macd[-1] < last_signal[-1] and
+                  last_hist[-1] < 0):
+                logger.info(f"Trend ribassista rilevato, strength: {total_strength:.4f}")
+                return -1
+            
+            logger.debug(f"Nessun trend significativo rilevato, strength: {total_strength:.4f}")
             return 0
             
         except Exception as e:

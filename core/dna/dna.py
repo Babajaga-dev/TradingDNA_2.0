@@ -189,10 +189,16 @@ class DNA:
             equity = np.cumprod(1 + strategy_returns) if len(strategy_returns) > 0 else np.array([1])
             
             # Calcola metriche con gestione eccezioni
-            total_return = max(equity[-1] - 1, -1) if len(equity) > 0 else 0
+            raw_return = equity[-1] - 1 if len(equity) > 0 else 0
+            # Normalizza il return nell'intervallo [-1, 1] usando tanh
+            total_return = np.tanh(raw_return)
+            
             volatility = np.std(strategy_returns) * np.sqrt(252) if len(strategy_returns) > 1 else 0
             sharpe = (np.mean(strategy_returns) / (np.std(strategy_returns) + 1e-6) * np.sqrt(252)) if len(strategy_returns) > 1 else 0
-            max_drawdown = np.min(equity / np.maximum.accumulate(equity) - 1) if len(equity) > 1 else 0
+            
+            # Calcola drawdown e assicura che sia positivo
+            drawdowns = 1 - equity / np.maximum.accumulate(equity)
+            max_drawdown = np.max(drawdowns) if len(drawdowns) > 1 else 0
             
             # Calcola statistiche trade
             trades = np.diff(signals) != 0  # Dimensione N-1

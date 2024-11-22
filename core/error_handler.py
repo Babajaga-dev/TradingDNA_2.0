@@ -86,6 +86,15 @@ class ErrorHandler(BaseExchange):
                 self._update_connection_status(True)
                 return result
                 
+            except RateLimitExceeded as e:
+                self._update_connection_status(False, str(e))
+                raise RateLimitError(
+                    f"Rate limit superato: {str(e)}",
+                    "exchange",
+                    time.time() + 60,  # Reset dopo 1 minuto
+                    {"error": str(e)}
+                )
+                
             except NetworkError as e:
                 delay = self._calculate_backoff_delay(attempt, base_delay)
                 self._update_connection_status(False, str(e))
@@ -103,15 +112,6 @@ class ErrorHandler(BaseExchange):
                     f"Retry tra {delay:.1f}s"
                 )
                 time.sleep(delay)
-                
-            except RateLimitExceeded as e:
-                self._update_connection_status(False, str(e))
-                raise RateLimitError(
-                    f"Rate limit superato: {str(e)}",
-                    "exchange",
-                    time.time() + 60,  # Reset dopo 1 minuto
-                    {"error": str(e)}
-                )
                 
             except InsufficientFunds as e:
                 self._update_connection_status(False, str(e))

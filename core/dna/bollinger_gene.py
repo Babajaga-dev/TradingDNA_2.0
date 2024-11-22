@@ -3,7 +3,7 @@
 Questo modulo implementa il gene Bollinger che calcola e genera segnali
 basati sulle bande di Bollinger.
 """
-from typing import Dict, Tuple
+from typing import Dict, Any
 import numpy as np
 import pandas as pd
 from utils.logger_base import get_component_logger
@@ -19,21 +19,21 @@ class BollingerGene(Gene):
         """Inizializza il gene Bollinger."""
         super().__init__("bollinger")
         self.period: int = self.params.get('period', 20)
-        self.num_std: float = self.params.get('num_std', 2.0)
-        self.signal_threshold: float = self.params.get('signal_threshold', 0.6)
-        logger.info(f"Inizializzato Bollinger con periodo {self.period} e {self.num_std} deviazioni standard")
+        self.std_dev: float = self.params.get('num_std', 2.0)
+        self.signal_threshold: float = self.params.get('signal_threshold', 0.8)
+        logger.info(f"Inizializzato Bollinger con periodo {self.period} e {self.std_dev} deviazioni standard")
         
-    def calculate(self, data: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def calculate(self, data: pd.DataFrame) -> Dict[str, np.ndarray]:
         """Calcola le Bollinger Bands.
         
         Args:
             data: DataFrame con colonna 'close' per i prezzi
             
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: 
-                - Middle Band (SMA)
-                - Upper Band
-                - Lower Band
+            Dict[str, np.ndarray]: Dizionario contenente:
+                - 'middle': Middle Band (SMA)
+                - 'upper': Upper Band
+                - 'lower': Lower Band
                 
         Raises:
             ValueError: Se manca la colonna 'close' nel DataFrame
@@ -55,11 +55,15 @@ class BollingerGene(Gene):
             std[i] = np.std(close_prices[i-self.period+1:i+1])
             
         # Calcola Upper e Lower Band
-        upper_band = middle_band + (std * self.num_std)
-        lower_band = middle_band - (std * self.num_std)
+        upper_band = middle_band + (std * self.std_dev)
+        lower_band = middle_band - (std * self.std_dev)
         
         logger.debug(f"Calcolate Bollinger Bands, ultimi valori MB: {middle_band[-5:]}")
-        return middle_band, upper_band, lower_band
+        return {
+            'middle': middle_band,
+            'upper': upper_band,
+            'lower': lower_band
+        }
         
     def _calculate_bandwidth(self, middle: float, upper: float, lower: float) -> float:
         """Calcola la Bandwidth delle bande.
@@ -97,51 +101,41 @@ class BollingerGene(Gene):
             float: Segnale di trading (-1=sell, 0=hold, 1=buy)
         """
         try:
-            middle_band, upper_band, lower_band = self.calculate(data)
+            bands = self.calculate(data)
             current_price = data['close'].iloc[-1]
             
-            # Calcola metriche
+            # Calcola bandwidth per verificare volatilità zero
             bandwidth = self._calculate_bandwidth(
-                middle_band[-1], upper_band[-1], lower_band[-1]
+                bands['middle'][-1], bands['upper'][-1], bands['lower'][-1]
             )
+            
+            # Se bandwidth è zero, non generare segnali
+            if bandwidth == 0:
+                logger.debug("Bandwidth zero, nessun segnale generato")
+                return 0
+            
+            # Segnali di trading base
+            if current_price < bands['lower'][-1]:  # Prezzo sotto Lower Band
+                logger.info(f"Bollinger oversold, prezzo: {current_price:.2f}, lower: {bands['lower'][-1]:.2f}")
+                return 1
+                
+            elif current_price > bands['upper'][-1]:  # Prezzo sopra Upper Band
+                logger.info(f"Bollinger overbought, prezzo: {current_price:.2f}, upper: {bands['upper'][-1]:.2f}")
+                return -1
+                
+            # Calcola %B per segnali avanzati
             percent_b = self._calculate_percent_b(
-                current_price, upper_band[-1], lower_band[-1]
+                current_price, bands['upper'][-1], bands['lower'][-1]
             )
             
             # Trend della volatilità
             prev_bandwidth = self._calculate_bandwidth(
-                middle_band[-2], upper_band[-2], lower_band[-2]
+                bands['middle'][-2], bands['upper'][-2], bands['lower'][-2]
             )
             volatility_expanding = bandwidth > prev_bandwidth
-            
-            # Segnali di trading
-            if current_price < lower_band[-1]:  # Prezzo sotto Lower Band
-                # Calcola confidenza basata su quanto il prezzo è sotto la banda
-                distance = (lower_band[-1] - current_price) / lower_band[-1] if lower_band[-1] != 0 else 0
-                confidence = min(distance * 2, 1.0)  # Aumenta sensibilità ma limita a 1
-                
-                # Modifica confidenza basata su volatilità
-                if volatility_expanding:
-                    confidence *= 0.8  # Riduce confidenza se volatilità in aumento
-                    
-                signal = 1 if confidence > self.signal_threshold else 0
-                logger.info(f"Bollinger oversold, confidence: {confidence:.2f}, signal: {signal}")
-                return signal
-                
-            elif current_price > upper_band[-1]:  # Prezzo sopra Upper Band
-                # Evita divisione per zero
-                distance = (current_price - upper_band[-1]) / upper_band[-1] if upper_band[-1] != 0 else 0
-                confidence = min(distance * 2, 1.0)
-                
-                if volatility_expanding:
-                    confidence *= 0.8
-                    
-                signal = -1 if confidence > self.signal_threshold else 0
-                logger.info(f"Bollinger overbought, confidence: {confidence:.2f}, signal: {signal}")
-                return signal
                 
             # Segnali di momentum basati su %B
-            elif 0.05 < percent_b < 0.2 and not volatility_expanding:
+            if 0.05 < percent_b < 0.2 and not volatility_expanding:
                 confidence = (0.2 - percent_b) / 0.15  # Scala tra 0-1
                 if confidence > self.signal_threshold:
                     logger.info(f"Bollinger momentum bullish, confidence: {confidence:.2f}")

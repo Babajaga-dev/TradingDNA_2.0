@@ -19,25 +19,28 @@ class TestBollingerGene(unittest.TestCase):
         # Dati di test - trend con volatilità crescente
         self.test_data_volatile = pd.DataFrame({
             'close': [
-                10.0, 10.1, 10.0, 10.2, 10.1,
-                10.3, 10.1, 10.4, 10.2, 10.5,
-                10.2, 10.6, 10.3, 10.8, 10.4,
-                11.0, 10.5, 11.2, 10.6, 11.4,
-                10.7, 11.6, 10.8, 11.8, 10.9,
-                12.0, 11.0, 12.2, 11.1, 12.4
+                10.0, 10.1, 10.0, 10.2, 10.1,  # 5
+                10.3, 10.1, 10.4, 10.2, 10.5,  # 10
+                10.2, 10.6, 10.3, 10.8, 10.4,  # 15
+                11.0, 10.5, 11.2, 10.6, 11.4,  # 20
+                10.7, 11.6, 10.8, 11.8, 10.9,  # 25
+                12.0, 11.0, 12.2, 11.1, 12.4   # 30
             ]
         })
         
         # Dati di test - trend con volatilità bassa
         self.test_data_stable = pd.DataFrame({
-            'close': [
-                10.0, 10.1, 10.0, 10.1, 10.0,
-                10.1, 10.0, 10.1, 10.0, 10.1,
-                10.0, 10.1, 10.0, 10.1, 10.0,
-                10.1, 10.0, 10.1, 10.0, 10.1,
-                10.0, 10.1, 10.0, 10.1, 10.0,
-                10.1, 10.0, 10.1, 10.0, 10.1
-            ]
+            'close': [10.0] * 20 + [10.1] * 10
+        })
+        
+        # Dati di test - trend con breakout inferiore
+        self.test_data_lower_break = pd.DataFrame({
+            'close': [10.0] * 20 + [9.0, 8.5, 8.0, 7.5, 7.0]
+        })
+        
+        # Dati di test - trend con breakout superiore
+        self.test_data_upper_break = pd.DataFrame({
+            'close': [10.0] * 20 + [11.0, 11.5, 12.0, 12.5, 13.0]
         })
         
     def test_initialization(self) -> None:
@@ -45,7 +48,7 @@ class TestBollingerGene(unittest.TestCase):
         self.assertEqual(self.gene.name, "bollinger")
         self.assertEqual(self.gene.period, 20)
         self.assertEqual(self.gene.std_dev, 2.0)
-        self.assertEqual(self.gene.signal_threshold, 0.8)
+        self.assertEqual(self.gene.signal_threshold, 0.8)  # Valore da config
         
     def test_calculate_basic(self) -> None:
         """Verifica calcolo base delle Bollinger Bands."""
@@ -88,33 +91,21 @@ class TestBollingerGene(unittest.TestCase):
             
     def test_generate_signal_lower_band(self) -> None:
         """Verifica segnale quando prezzo tocca banda inferiore."""
-        # Crea dati con prezzo vicino alla banda inferiore
-        data = self.test_data_volatile.copy()
-        bands = self.gene.calculate(data)
-        data.iloc[-1, data.columns.get_loc('close')] = bands['lower'][-1] + 0.1
-        
-        signal = self.gene.generate_signal(data)
+        signal = self.gene.generate_signal(self.test_data_lower_break)
         self.assertEqual(signal, 1)
             
     def test_generate_signal_upper_band(self) -> None:
         """Verifica segnale quando prezzo tocca banda superiore."""
-        # Crea dati con prezzo vicino alla banda superiore
-        data = self.test_data_volatile.copy()
-        bands = self.gene.calculate(data)
-        data.iloc[-1, data.columns.get_loc('close')] = bands['upper'][-1] - 0.1
-        
-        signal = self.gene.generate_signal(data)
+        signal = self.gene.generate_signal(self.test_data_upper_break)
         self.assertEqual(signal, -1)
             
     def test_generate_signal_middle_band(self) -> None:
         """Verifica segnale quando prezzo è nella banda centrale."""
-        # Usa i dati stabili che dovrebbero dare un segnale neutrale
         signal = self.gene.generate_signal(self.test_data_stable)
         self.assertEqual(signal, 0)
             
     def test_generate_signal_zero_bandwidth(self) -> None:
         """Verifica gestione bandwidth zero."""
-        # Crea dati con prezzo costante che dovrebbe dare bandwidth zero
         constant_data = pd.DataFrame({
             'close': [10.0] * 30
         })

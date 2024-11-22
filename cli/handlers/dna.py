@@ -77,6 +77,7 @@ def handle_gene_analysis(dna: DNA, args) -> None:
         
     except Exception as e:
         print_error(f"Errore analisi {args.type}: {str(e)}")
+        raise
 
 def handle_optimization(dna: DNA) -> None:
     """Gestisce l'ottimizzazione dei parametri."""
@@ -111,6 +112,7 @@ def handle_optimization(dna: DNA) -> None:
         
     except Exception as e:
         print_error(f"Errore ottimizzazione: {str(e)}")
+        raise
 
 def handle_validation(dna: DNA) -> None:
     """Gestisce la validazione della strategia."""
@@ -138,6 +140,7 @@ def handle_validation(dna: DNA) -> None:
         
     except Exception as e:
         print_error(f"Errore validazione: {str(e)}")
+        raise
 
 def handle_composition(dna: DNA) -> None:
     """Gestisce la composizione dei segnali."""
@@ -187,6 +190,7 @@ def handle_composition(dna: DNA) -> None:
         
     except Exception as e:
         print_error(f"Errore composizione: {str(e)}")
+        raise
 
 def handle_dna_command(args) -> None:
     """Gestisce i comandi del sistema DNA."""
@@ -237,7 +241,9 @@ def handle_dna_command(args) -> None:
             
         else:
             print_error(f"Azione {args.action} non valida")
+            raise ValueError(f"Azione {args.action} non valida")
             
     except Exception as e:
         logger.error(f"Errore durante esecuzione comando DNA: {str(e)}")
         print_error(f"Errore: {str(e)}")
+        raise
