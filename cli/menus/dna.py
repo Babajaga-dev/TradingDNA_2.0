@@ -6,7 +6,7 @@ from rich.table import Table
 from rich.console import Console
 
 from cli.utils import show_progress, print_error
-from cli.handlers.dna import DNAHandler
+from cli.handlers.dna import DNAMainHandler  # Modificato: uso DNAMainHandler invece di DNAHandler
 
 console = Console()
 
@@ -15,7 +15,7 @@ class DNAMenu:
     
     def __init__(self):
         """Initialize the DNA menu."""
-        self.handler = DNAHandler()
+        self.handler = DNAMainHandler()  # Modificato: inizializzo DNAMainHandler
     
     def display_menu(self) -> None:
         """Display the DNA menu options."""

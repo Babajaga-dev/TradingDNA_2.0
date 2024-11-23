@@ -67,7 +67,7 @@ class MainMenu:
         """Display the main menu options with enhanced visual feedback."""
         # Menu options
         menu_text = (
-            "🧬 [bold cyan]TradingDNA 2.0[/bold cyan]\n\n\n"
+            "🧬 [bold cyan]TradingDNA 2.0[/bold cyan]\n\n"
             "1. 🧬 [green]Sistema DNA[/green]\n"
             "2. 🛡️ [blue]Sistema Immunitario[/blue]\n"
             "3. ⚡ [yellow]Sistema Metabolismo[/yellow]\n"
@@ -77,9 +77,9 @@ class MainMenu:
             "7. ⚙️ [cyan]Configurazione[/cyan]\n"
             "8. 📥 [cyan]Download Dati[/cyan]\n"
             "9. 📊 [cyan]Log e Monitor[/cyan]\n"
-            "───────────────────────\n\n\n\n"
+            "───────────────────────\n"
             "R. ⟲ [red]Reset Sistema[/red]\n"
-            "0. 🚪 [white]Esci[/white]\n\n\n"
+            "0. 🚪 [white]Esci[/white]\n\n"
             "Seleziona un'opzione:"
         )
         

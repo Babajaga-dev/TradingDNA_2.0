@@ -7,7 +7,7 @@ from rich import print as rprint
 
 from cli.utils import print_error, print_success
 from utils.logger_base import get_component_logger
-from utils.config import load_config
+from utils.config import ConfigManager
 from core.dna import DNA, RSIGene, MACDGene, BollingerGene, VolumeGene
 from core.dna.pattern_recognition import PatternRecognition
 
@@ -25,6 +25,7 @@ class DNAHandler:
     def __init__(self):
         """Initialize the DNA handler."""
         self.dna = DNA()
+        self.config_manager = ConfigManager()
     
     def _load_market_data(self, pair: str = "BTC/USDT", timeframe: str = "1h") -> pd.DataFrame:
         """Load market data from parquet file."""
@@ -38,7 +39,7 @@ class DNAHandler:
     def handle_init(self) -> None:
         """Handle DNA initialization."""
         try:
-            config = load_config('dna.yaml')
+            config = self.config_manager.get_config('dna')
             
             # Prepare genes
             logger.info("Preparazione geni...")
