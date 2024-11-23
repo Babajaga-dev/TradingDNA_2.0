@@ -1,0 +1,22 @@
+Comando per cercare file per numero righe
+
+Get-ChildItem -Recurse -File -Filter "*.py" | ForEach-Object {
+    $lineCount = (Get-Content $_.FullName).Count
+    if ($lineCount -gt 350) {
+        [PSCustomObject]@{
+            FilePath  = $_.FullName
+            LineCount = $lineCount
+        }
+    }
+} | Format-Table -AutoSize
+
+
+Con filtro 
+
+Get-ChildItem -Recurse -File -Filter "*.py" | ForEach-Object {
+    $lineCount = (Get-Content $_.FullName).Count
+    [PSCustomObject]@{
+        FilePath  = $_.FullName
+        LineCount = $lineCount
+    }
+} | Where-Object { $_.LineCount -gt 350 } | Format-Table -AutoSize

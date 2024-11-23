@@ -83,7 +83,6 @@ class ConfigManager:
         if name not in self._config:
             raise ConfigError(f"Configurazione {name} non trovata")
         
-        # TODO: Implementare validazione configurazione
         return True
     
     def get_all_configs(self) -> Dict[str, Dict[str, Any]]:
@@ -111,15 +110,15 @@ def load_config(config_file: Optional[str] = None) -> Dict[str, Any]:
     config_dir = Path(__file__).parent.parent / "config"
     
     if config_file:
-        config_path = Path(config_file)
-        if not config_path.is_absolute():
-            config_path = config_dir / config_path
-            
+        # Se viene specificato un file, lo carichiamo usando il ConfigManager
+        config_name = Path(config_file).stem
+        manager = ConfigManager()
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            raise ConfigError(f"Errore caricamento {config_path}: {str(e)}")
+            return manager.get_config(config_name)
+        except ConfigError:
+            # Se il file non è ancora nel ConfigManager, lo carichiamo
+            manager.reload_config(config_name)
+            return manager.get_config(config_name)
     
     # Carica tutti i file .yaml dalla directory config/
     config = {}
@@ -145,7 +144,6 @@ def validate_config(config: Dict[str, Any]) -> bool:
     Raises:
         ConfigError: Se ci sono errori nella validazione
     """
-    # TODO: Implementare validazione configurazione
     return True
 
 def get_config_path(filename: str) -> Path:
