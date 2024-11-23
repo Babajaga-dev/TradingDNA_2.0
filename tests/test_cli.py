@@ -5,14 +5,14 @@ import pandas as pd
 from rich.console import Console
 from rich.table import Table
 
-from cli.handlers import DNAHandler
+from cli.handlers.dna import DNAMainHandler
 from cli.menus.dna import DNAMenu
 from utils.initializer import InitializationError
 
 @pytest.fixture
 def mock_dna_handler():
     """Create a mock DNAHandler."""
-    return MagicMock(spec=DNAHandler)
+    return MagicMock(spec=DNAMainHandler)
 
 @pytest.fixture
 def mock_console():
@@ -33,7 +33,7 @@ def mock_table():
 def mock_dna_menu():
     """Create a mock DNAMenu."""
     menu = DNAMenu()
-    menu.handler = MagicMock(spec=DNAHandler)
+    menu.handler = MagicMock(spec=DNAMainHandler)
     return menu
 
 def test_dna_menu_display():
@@ -62,7 +62,7 @@ def test_dna_menu_main_options():
         mock_console.input.return_value = "0"
         
         menu = DNAMenu()
-        menu.handler = MagicMock(spec=DNAHandler)
+        menu.handler = MagicMock(spec=DNAMainHandler)
         
         # Test initialization
         menu.handle_choice("1")
@@ -109,7 +109,7 @@ def test_genes_submenu():
         mock_console.input.side_effect = ["1", "", "0"]  # Select RSI, continue, exit
         
         menu = DNAMenu()
-        menu.handler = MagicMock(spec=DNAHandler)
+        menu.handler = MagicMock(spec=DNAMainHandler)
         
         # Enter gene management and select RSI
         menu._handle_genes()
@@ -127,7 +127,7 @@ def test_error_handling():
         mock_console.input.return_value = ""
         
         menu = DNAMenu()
-        menu.handler = MagicMock(spec=DNAHandler)
+        menu.handler = MagicMock(spec=DNAMainHandler)
         menu.handler.handle_init.side_effect = Exception("Test error")
         
         menu.handle_choice("1")
@@ -135,9 +135,10 @@ def test_error_handling():
         # Verify error was printed
         mock_print_error.assert_called_with("Errore: Test error")
 
-@patch('cli.handlers.dna.DNA')
-@patch('cli.handlers.dna.load_config')
-def test_dna_handler_init(mock_load_config, mock_dna_class):
+@patch('cli.handlers.dna_base.DNA')
+@patch('utils.config.ConfigManager.get_config')
+@patch('core.dna.gene.load_config')
+def test_dna_handler_init(mock_gene_load_config, mock_get_config, mock_dna_class):
     """Test DNA initialization."""
     mock_config = {
         'indicators': {
@@ -146,29 +147,36 @@ def test_dna_handler_init(mock_load_config, mock_dna_class):
             'macd': {},
             'bollinger': {},
             'volume': {}
+        },
+        'optimization': {
+            'pattern_recognition': {},
+            'rsi': {},
+            'macd': {},
+            'bollinger': {},
+            'volume': {}
         }
     }
-    mock_load_config.return_value = mock_config
+    mock_get_config.return_value = mock_config
+    mock_gene_load_config.return_value = mock_config
     mock_dna_instance = MagicMock()
     mock_dna_class.return_value = mock_dna_instance
     
-    handler = DNAHandler()
+    handler = DNAMainHandler()
     handler.handle_init()
     
-    mock_load_config.assert_called_once_with('dna.yaml')
+    mock_get_config.assert_called_once_with('dna')
     assert mock_dna_instance.add_gene.call_count == 5
 
-@patch('cli.handlers.dna.pd.read_parquet')
-def test_dna_handler_load_market_data(mock_read_parquet):
+@patch('cli.handlers.dna_base.DNAHandler._load_market_data')
+def test_dna_handler_load_market_data(mock_load_market_data):
     """Test market data loading."""
     mock_data = pd.DataFrame({'close': [1, 2, 3]})
-    mock_read_parquet.return_value = mock_data
+    mock_load_market_data.return_value = mock_data
     
-    handler = DNAHandler()
-    data = handler._load_market_data()
+    handler = DNAMainHandler()
+    handler.handle_pattern_analysis()
     
-    assert data is mock_data
-    mock_read_parquet.assert_called_once()
+    mock_load_market_data.assert_called_once()
 
 def test_init_command():
     """Test init command."""

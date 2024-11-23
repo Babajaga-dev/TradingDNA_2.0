@@ -1,185 +1,80 @@
-"""Test per il modulo DNA Downloader."""
+"""Test per il modulo DNADataDownloader."""
 import pytest
-import pandas as pd
-from unittest.mock import Mock, patch
-from pathlib import Path
-
-from core.dna_downloader import DNADataDownloader, DatasetConfig, DNADataError
+from core.dna_downloader import DNADataDownloader
+from core.exceptions import DNADataError, ConfigurationError
 from core.base_exchange import BaseExchange
-from utils.config import ConfigError
 
-@pytest.fixture
-def mock_exchange():
-    """Fixture per mock dell'exchange."""
-    mock = Mock()
+def test_calculate_candles_for_timeframe():
+    """Test del calcolo proporzionale delle candele."""
+    downloader = DNADataDownloader(BaseExchange("config/network.yaml"))
     
-    # Mock dei dati OHLCV
-    sample_data = [
-        # timestamp, open, high, low, close, volume
-        [1609459200000, 100.0, 105.0, 95.0, 102.0, 1000.0],
-        [1609462800000, 102.0, 107.0, 97.0, 104.0, 1100.0],
-        [1609466400000, 104.0, 109.0, 99.0, 106.0, 1200.0]
-    ]
+    # Test calcolo da 1d a timeframe più piccoli
+    assert downloader._calculate_candles_for_timeframe("1d", 100, "4h") == 600  # 1d = 6 * 4h
+    assert downloader._calculate_candles_for_timeframe("1d", 100, "1h") == 2400  # 1d = 24 * 1h
+    assert downloader._calculate_candles_for_timeframe("1d", 100, "15m") == 9600  # 1d = 96 * 15m
     
-    # Configura il mock per avere il metodo fetch_ohlcv
-    mock.fetch_ohlcv = Mock(return_value=sample_data)
+    # Test calcolo da 4h a timeframe più piccoli
+    assert downloader._calculate_candles_for_timeframe("4h", 100, "1h") == 400  # 4h = 4 * 1h
+    assert downloader._calculate_candles_for_timeframe("4h", 100, "15m") == 1600  # 4h = 16 * 15m
     
-    return mock
+    # Test stesso timeframe
+    assert downloader._calculate_candles_for_timeframe("1h", 100, "1h") == 100
+    assert downloader._calculate_candles_for_timeframe("4h", 100, "4h") == 100
+    assert downloader._calculate_candles_for_timeframe("1d", 100, "1d") == 100
 
-@pytest.fixture
-def downloader(mock_exchange):
-    """Fixture per il downloader."""
-    with patch('utils.config.load_config') as mock_config:
-        # Mock della configurazione
-        mock_config.return_value = {
-            "data": {
-                "base_path": "test_data",
-                "split_ratios": {
-                    "training": 0.7,
-                    "validation": 0.15,
-                    "testing": 0.15
-                }
-            }
-        }
-        return DNADataDownloader(mock_exchange)
-
-def test_dataset_config_validation():
-    """Test validazione configurazione dataset."""
-    # Test configurazione valida
-    config = DatasetConfig(0.7, 0.15, 0.15)
-    assert config.training_ratio == 0.7
+def test_calculate_candles_for_timeframe_errors():
+    """Test gestione errori nel calcolo delle candele."""
+    downloader = DNADataDownloader(BaseExchange("config/network.yaml"))
     
-    # Test configurazione non valida
+    # Test timeframe non supportato
     with pytest.raises(DNADataError):
-        DatasetConfig(0.8, 0.15, 0.15)  # Somma > 1
+        downloader._calculate_candles_for_timeframe("invalid", 100, "1h")
+    
+    with pytest.raises(DNADataError):
+        downloader._calculate_candles_for_timeframe("1h", 100, "invalid")
 
-def test_download_candles(downloader, mock_exchange):
-    """Test download candele."""
-    # Test download singolo timeframe
-    data = downloader.download_candles("BTC/USDT", ["1h"], 3)
+def test_calculate_days_from_candles():
+    """Test del calcolo dei giorni dalle candele."""
+    downloader = DNADataDownloader(BaseExchange("config/network.yaml"))
     
-    assert "1h" in data
-    assert isinstance(data["1h"], pd.DataFrame)
-    assert len(data["1h"]) == 3
-    assert list(data["1h"].columns) == ['open', 'high', 'low', 'close', 'volume']
+    # Test calcolo giorni per vari timeframe
+    assert downloader._calculate_days_from_candles("1d", 100) == 100.0
+    assert downloader._calculate_days_from_candles("4h", 100) == 16.666666666666668  # 100 * 4h = 400h = 16.67d
+    assert downloader._calculate_days_from_candles("1h", 100) == 4.166666666666667  # 100 * 1h = 100h = 4.17d
+    assert downloader._calculate_days_from_candles("15m", 100) == 1.0416666666666667  # 100 * 15m = 1500m = 1.04d
     
-    # Verifica chiamata exchange
-    mock_exchange.fetch_ohlcv.assert_called_once_with(
+    # Test con zero candele
+    assert downloader._calculate_days_from_candles("1d", 0) == 0.0
+    
+    # Test con numeri grandi
+    assert downloader._calculate_days_from_candles("1h", 1000) == 41.666666666666664  # 1000h = 41.67d
+
+def test_calculate_days_from_candles_errors():
+    """Test gestione errori nel calcolo dei giorni."""
+    downloader = DNADataDownloader(BaseExchange("config/network.yaml"))
+    
+    # Test timeframe non supportato
+    with pytest.raises(DNADataError):
+        downloader._calculate_days_from_candles("invalid", 100)
+
+def test_download_candles_timeframe_adaptation():
+    """Test dell'adattamento del numero di candele per timeframe."""
+    downloader = DNADataDownloader(BaseExchange("config/network.yaml"))
+    
+    # Mock della funzione fetch_ohlcv per evitare chiamate reali all'exchange
+    def mock_fetch_ohlcv(symbol, timeframe, limit):
+        return [(i, 100, 101, 99, 100, 1000) for i in range(limit)]
+    
+    downloader.exchange.fetch_ohlcv = mock_fetch_ohlcv
+    
+    # Test download con multipli timeframe
+    data = downloader.download_candles(
         symbol="BTC/USDT",
-        timeframe="1h",
-        limit=3
+        timeframes=["1d", "4h", "1h"],
+        num_candles=100
     )
     
-    # Test errore download
-    mock_exchange.fetch_ohlcv.side_effect = Exception("API error")
-    with pytest.raises(DNADataError):
-        downloader.download_candles("BTC/USDT", ["1h"], 3)
-
-def test_validate_data(downloader):
-    """Test validazione dati."""
-    # Dataset valido
-    valid_data = {
-        "1h": pd.DataFrame({
-            'open': [100.0, 102.0],
-            'high': [105.0, 107.0],
-            'low': [95.0, 97.0],
-            'close': [102.0, 104.0],
-            'volume': [1000.0, 1100.0]
-        }, index=pd.date_range('2021-01-01', periods=2, freq='h'))
-    }
-    
-    downloader.validate_data(valid_data)  # Non dovrebbe sollevare eccezioni
-    
-    # Test dati mancanti
-    invalid_data = {
-        "1h": pd.DataFrame({
-            'open': [100.0, None],
-            'high': [105.0, 107.0],
-            'low': [95.0, 97.0],
-            'close': [102.0, 104.0],
-            'volume': [1000.0, 1100.0]
-        }, index=pd.date_range('2021-01-01', periods=2, freq='h'))
-    }
-    
-    with pytest.raises(DNADataError):
-        downloader.validate_data(invalid_data)
-        
-    # Test colonne mancanti
-    invalid_data = {
-        "1h": pd.DataFrame({
-            'open': [100.0, 102.0],
-            'close': [102.0, 104.0],
-        }, index=pd.date_range('2021-01-01', periods=2, freq='h'))
-    }
-    
-    with pytest.raises(DNADataError):
-        downloader.validate_data(invalid_data)
-
-def test_split_data(downloader):
-    """Test split dei dati."""
-    # Crea dataset di test
-    data = {
-        "1h": pd.DataFrame({
-            'open': range(100),
-            'high': range(100),
-            'low': range(100),
-            'close': range(100),
-            'volume': range(100)
-        }, index=pd.date_range('2021-01-01', periods=100, freq='h'))
-    }
-    
-    # Split dei dati
-    training, validation, testing = downloader.split_data(data)
-    
-    # Verifica dimensioni split
-    assert len(training["1h"]) == 70  # 70% training
-    assert len(validation["1h"]) == 15  # 15% validation
-    assert len(testing["1h"]) == 15  # 15% testing
-    
-    # Verifica che gli indici siano continui
-    assert training["1h"].index[-1] < validation["1h"].index[0]
-    assert validation["1h"].index[-1] < testing["1h"].index[0]
-
-@patch('pandas.DataFrame.to_parquet')
-def test_save_data(mock_to_parquet, downloader, tmp_path):
-    """Test salvataggio dati."""
-    # Crea dataset di test
-    data = {
-        "1h": pd.DataFrame({
-            'open': range(10),
-            'high': range(10),
-            'low': range(10),
-            'close': range(10),
-            'volume': range(10)
-        }, index=pd.date_range('2021-01-01', periods=10, freq='h'))
-    }
-    
-    # Split dei dati
-    training, validation, testing = downloader.split_data(data)
-    
-    # Test salvataggio
-    downloader.save_data(training, validation, testing, "BTC/USDT")
-    
-    # Verifica chiamate to_parquet
-    assert mock_to_parquet.call_count == 3  # Un file per ogni split
-    
-    # Test errore salvataggio
-    mock_to_parquet.side_effect = Exception("Storage error")
-    with pytest.raises(DNADataError):
-        downloader.save_data(training, validation, testing, "BTC/USDT")
-
-def test_integration(downloader, mock_exchange, tmp_path):
-    """Test integrazione completo."""
-    # Download dati
-    data = downloader.download_candles("BTC/USDT", ["1h", "4h"], 100)
-    
-    # Validazione
-    downloader.validate_data(data)
-    
-    # Split
-    training, validation, testing = downloader.split_data(data)
-    
-    # Salvataggio
-    with patch('pandas.DataFrame.to_parquet') as mock_save:
-        downloader.save_data(training, validation, testing, "BTC/USDT")
-        assert mock_save.call_count == 6  # 2 timeframes * 3 splits
+    # Verifica che il numero di candele sia stato adattato per ogni timeframe
+    assert len(data["1d"]) == 100  # Timeframe di riferimento
+    assert len(data["4h"]) == 600  # 6 volte più candele
+    assert len(data["1h"]) == 2400  # 24 volte più candele

@@ -7,12 +7,16 @@ from typing import Dict, List
 import logging
 import numpy as np
 import pandas as pd
-from .dna_base import DNABase
 
 logger = logging.getLogger(__name__)
 
-class DNAStrategy(DNABase):
+class DNAStrategy:
     """Gestisce la generazione dei segnali e le metriche della strategia."""
+    
+    def __init__(self):
+        """Inizializza la strategia."""
+        self.strategy_metrics = {}
+        self.performance_metrics = {}
 
     def get_strategy_metrics(self) -> Dict[str, float]:
         """Restituisce le metriche correnti della strategia.
@@ -48,11 +52,12 @@ class DNAStrategy(DNABase):
             'health_score': getattr(self.performance_metrics, 'health_score', 0.0)
         }
 
-    def get_strategy_signal(self, data: pd.DataFrame) -> float:
+    def get_strategy_signal(self, data: pd.DataFrame, genes: Dict) -> float:
         """Genera un segnale composito dalla strategia.
         
         Args:
             data: DataFrame con i dati OHLCV
+            genes: Dizionario dei geni da utilizzare
             
         Returns:
             Segnale di trading aggregato: -1 (sell), 0 (hold), 1 (buy)
@@ -76,7 +81,7 @@ class DNAStrategy(DNABase):
             logger.error(f"Colonne mancanti o non valide: {data.columns}")
             raise ValueError(f"Colonne mancanti o non valide: {data.columns}")
         
-        if not self.genes:
+        if not genes:
             logger.warning("Nessun gene presente nel DNA")
             return 0.0
             
@@ -84,7 +89,7 @@ class DNAStrategy(DNABase):
         signals = []
         weights = []
         
-        for gene in self.genes.values():
+        for gene in genes.values():
             try:
                 # Gestione dataset piccoli con parametri minimi
                 min_data_points = getattr(gene, 'min_data_points', 10)
@@ -119,7 +124,7 @@ class DNAStrategy(DNABase):
         
         # Registra latenza
         latency = (time.time() - start_time) * 1000  # ms
-        self.performance_metrics.record_signal_latency(latency)
+        self.performance_metrics['signal_latency'] = latency
         
         logger.debug(f"Generato segnale strategia: {final_signal}")
         return float(final_signal)

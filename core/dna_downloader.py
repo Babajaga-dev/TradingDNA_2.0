@@ -34,6 +34,17 @@ class DatasetConfig:
 class DNADataDownloader:
     """Gestisce il download e la preparazione dei dati per il DNA system."""
     
+    # Mapping dei timeframe in minuti
+    TIMEFRAME_MINUTES = {
+        "1m": 1,
+        "5m": 5,
+        "15m": 15,
+        "30m": 30,
+        "1h": 60,
+        "4h": 240,
+        "1d": 1440
+    }
+    
     def __init__(self, exchange: BaseExchange):
         """Inizializza il downloader.
         
@@ -53,6 +64,50 @@ class DNADataDownloader:
             )
         except Exception as e:
             raise ConfigError(f"Errore caricamento configurazione DNA: {str(e)}")
+
+    def _calculate_candles_for_timeframe(self, reference_tf: str, num_candles: int, target_tf: str) -> int:
+        """Calcola il numero di candele proporzionale per il timeframe target.
+        
+        Args:
+            reference_tf: Timeframe di riferimento (il più grande)
+            num_candles: Numero di candele per il timeframe di riferimento
+            target_tf: Timeframe per cui calcolare il numero di candele
+            
+        Returns:
+            Numero di candele proporzionale per il target timeframe
+            
+        Raises:
+            DNADataError: Se il timeframe non è supportato
+        """
+        if reference_tf not in self.TIMEFRAME_MINUTES or target_tf not in self.TIMEFRAME_MINUTES:
+            raise DNADataError(f"Timeframe non supportato: {reference_tf} o {target_tf}")
+            
+        ref_minutes = self.TIMEFRAME_MINUTES[reference_tf]
+        target_minutes = self.TIMEFRAME_MINUTES[target_tf]
+        
+        # Calcola il rapporto e moltiplica per il numero di candele
+        ratio = ref_minutes / target_minutes
+        return int(num_candles * ratio)
+
+    def _calculate_days_from_candles(self, timeframe: str, num_candles: int) -> float:
+        """Calcola il numero di giorni corrispondenti alle candele.
+        
+        Args:
+            timeframe: Timeframe delle candele
+            num_candles: Numero di candele
+            
+        Returns:
+            Numero di giorni corrispondenti
+            
+        Raises:
+            DNADataError: Se il timeframe non è supportato
+        """
+        if timeframe not in self.TIMEFRAME_MINUTES:
+            raise DNADataError(f"Timeframe non supportato: {timeframe}")
+            
+        minutes = self.TIMEFRAME_MINUTES[timeframe]
+        total_minutes = minutes * num_candles
+        return total_minutes / (24 * 60)  # Converti in giorni
         
     def download_candles(
         self, 
@@ -67,7 +122,7 @@ class DNADataDownloader:
         Args:
             symbol: Simbolo trading (es. BTC/USDT)
             timeframes: Lista di timeframe (es. ["1h", "4h", "1d"])
-            num_candles: Numero totale di candele da scaricare
+            num_candles: Numero totale di candele per il timeframe più grande
             progress: Oggetto Progress opzionale per aggiornare la barra
             task_id: ID del task per l'aggiornamento del progresso
             
@@ -78,14 +133,20 @@ class DNADataDownloader:
             DNADataError: Se il download fallisce
         """
         results = {}
+        
+        # Identifica il timeframe più grande
+        max_tf = max(timeframes, key=lambda tf: self.TIMEFRAME_MINUTES[tf])
             
         for tf in timeframes:
             try:
-                logger.debug(f"Download {num_candles} candele {symbol} {tf}")
+                # Calcola il numero di candele per questo timeframe
+                tf_candles = self._calculate_candles_for_timeframe(max_tf, num_candles, tf)
+                
+                logger.debug(f"Download {tf_candles} candele {symbol} {tf}")
                 candles = self.exchange.fetch_ohlcv(
                     symbol=symbol,
                     timeframe=tf,
-                    limit=num_candles
+                    limit=tf_candles
                 )
                 
                 df = pd.DataFrame(
@@ -264,37 +325,3 @@ class DNADataDownloader:
         
         console.print("\n")
         console.print(summary_table)
-        
-        # Se richiesto un dataset specifico, mostra anche i dati dettagliati
-        if dataset_type:
-            try:
-                filename = f"{base_path}/{symbol_safe}_{timeframe}_{dataset_type}.parquet"
-                df = pd.read_parquet(filename)
-                
-                detail_table = Table(title=f"📈 Dettaglio {dataset_type}")
-                detail_table.add_column("Data", style="yellow")
-                detail_table.add_column("Open", justify="right", style="green")
-                detail_table.add_column("High", justify="right", style="green")
-                detail_table.add_column("Low", justify="right", style="red")
-                detail_table.add_column("Close", justify="right", style="blue")
-                detail_table.add_column("Volume", justify="right", style="magenta")
-                
-                # Mostra le prime e ultime 5 righe
-                rows_to_show = pd.concat([df.head(5), df.tail(5)])
-                for idx, row in rows_to_show.iterrows():
-                    detail_table.add_row(
-                        idx.strftime("%Y-%m-%d %H:%M"),
-                        f"{row['open']:.2f}",
-                        f"{row['high']:.2f}",
-                        f"{row['low']:.2f}",
-                        f"{row['close']:.2f}",
-                        f"{row['volume']:.0f}"
-                    )
-                    if len(detail_table.rows) == 5:
-                        detail_table.add_row("...", "...", "...", "...", "...", "...")
-                
-                console.print("\n")
-                console.print(detail_table)
-                
-            except Exception as e:
-                logger.error(f"Errore lettura dati dettagliati: {str(e)}")

@@ -29,6 +29,11 @@ class ImmuneSystem(ImmuneBase):
         super().__init__(config)
         self._analysis = ImmuneAnalysis(config)
         self._health = ImmuneHealth(config)
+        self._market_state = {
+            'risk_level': 'normal',
+            'volatility': 0.0,
+            'avg_volume': 0.0
+        }
         logger.info("Immune System initialized with all components")
 
     def analyze_risk(self, positions: List[Dict]) -> RiskMetrics:
@@ -82,7 +87,15 @@ class ImmuneSystem(ImmuneBase):
         Returns:
             Filtered signal if valid, None if rejected
         """
-        return self._analysis.filter_signal(signal)
+        if signal.get('confidence', 0) < 0.7:
+            logger.info("Signal rejected due to low confidence")
+            return None
+            
+        if self._market_state['risk_level'] == 'high':
+            logger.info("Signal rejected due to high risk environment")
+            return None
+            
+        return signal
 
     def get_system_health(self) -> Dict[str, float]:
         """
@@ -100,5 +113,76 @@ class ImmuneSystem(ImmuneBase):
         Args:
             new_metrics: New metrics to update the system with
         """
-        self._health.update_metrics(new_metrics)
+        self._metrics = new_metrics  # Update local metrics
+        self._health.update_metrics(new_metrics)  # Update health component metrics
         logger.info("Updated immune system metrics")
+
+    def _assess_counterparty_risk(self, positions: List[Dict]) -> float:
+        """
+        Assess counterparty risk based on exchange health and position distribution.
+        
+        Args:
+            positions: List of current trading positions
+
+        Returns:
+            Normalized counterparty risk score between 0 and 1
+        """
+        return self._analysis._assess_counterparty_risk(positions)
+
+    def _get_exchange_health_score(self, exchange: str) -> float:
+        """
+        Get health score for a specific exchange.
+        
+        Args:
+            exchange: Exchange identifier
+
+        Returns:
+            Health score between 0 and 1, where 1 is perfectly healthy
+        """
+        if exchange not in self._exchange_health:
+            return 0.8  # Default score for unknown exchanges
+            
+        health = self._exchange_health[exchange]
+        
+        # Calculate health score based on various metrics
+        uptime = health.get('uptime', 0.95)
+        api_response_time = health.get('api_response_time', 500)  # ms
+        error_rate = health.get('error_rate', 0.05)
+        
+        # Normalize response time (0-1000ms -> 1-0)
+        response_score = max(0, 1 - (api_response_time / 1000))
+        
+        # Calculate final score with weighted components
+        score = (
+            uptime * 0.4 +  # 40% weight on uptime
+            response_score * 0.3 +  # 30% weight on response time
+            (1 - error_rate) * 0.3  # 30% weight on error rate
+        )
+        
+        return max(0.0, min(1.0, score))
+
+    def _calculate_drawdown(self, positions: List[Dict]) -> float:
+        """
+        Calculate current drawdown across all positions.
+        
+        Args:
+            positions: List of current trading positions
+
+        Returns:
+            Current drawdown as a ratio between 0 and 1
+        """
+        return self._analysis._calculate_drawdown(positions)
+
+    def _update_market_state(self, market_data: Dict) -> None:
+        """
+        Update internal market state with new data.
+        
+        Args:
+            market_data: New market data including price, volume, and volatility
+        """
+        self._market_state.update({
+            'previous_price': self._market_state.get('price', market_data['price']),
+            'price': market_data['price'],
+            'volume': market_data.get('volume', 0),
+            'volatility': market_data.get('volatility', self._market_state['volatility'])
+        })

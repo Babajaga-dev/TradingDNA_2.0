@@ -15,12 +15,25 @@ logger = logging.getLogger(__name__)
 class DNA(DNABase):
     """Gestisce la struttura delle strategie di trading."""
     
+    _instance: Optional['DNA'] = None
+    
     def __init__(self):
         """Inizializza il DNA system."""
         super().__init__()
         self._strategy = DNAStrategy()
         self._optimization = DNAOptimization()
         logger.info("DNA system inizializzato con tutti i componenti")
+
+    @classmethod
+    def get_instance(cls) -> 'DNA':
+        """Restituisce l'istanza singleton del DNA.
+        
+        Returns:
+            DNA: Istanza singleton
+        """
+        if cls._instance is None:
+            cls._instance = DNA()
+        return cls._instance
 
     def get_strategy_metrics(self) -> Dict[str, float]:
         """Restituisce le metriche correnti della strategia.
@@ -50,7 +63,7 @@ class DNA(DNABase):
         Raises:
             ValueError: Se i dati non sono validi
         """
-        return self._strategy.get_strategy_signal(data)
+        return self._strategy.get_strategy_signal(data, self.genes)
 
     def validate_strategy(self, data: pd.DataFrame) -> Dict[str, float]:
         """Valida la strategia su un set di dati.
@@ -64,7 +77,7 @@ class DNA(DNABase):
         Raises:
             ValueError: Se i dati non sono validi
         """
-        return self._optimization.validate_strategy(data)
+        return self._optimization.validate_strategy(data, self.genes)
 
     def optimize_strategy(self, data: pd.DataFrame) -> None:
         """Ottimizza tutti i geni della strategia.
@@ -72,4 +85,4 @@ class DNA(DNABase):
         Args:
             data: DataFrame con i dati OHLCV
         """
-        self._optimization.optimize_strategy(data)
+        self._optimization.optimize_strategy(data, self.genes)

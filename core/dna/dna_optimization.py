@@ -7,18 +7,25 @@ from typing import Dict
 import logging
 import numpy as np
 import pandas as pd
-from .dna_base import DNABase
+from .dna_strategy import DNAStrategy
 
 logger = logging.getLogger(__name__)
 
-class DNAOptimization(DNABase):
+class DNAOptimization:
     """Gestisce la validazione e ottimizzazione delle strategie."""
+    
+    def __init__(self):
+        """Inizializza l'ottimizzatore."""
+        self.strategy_metrics = type('Metrics', (), {})()
+        self.performance_metrics = type('Metrics', (), {})()
+        self._strategy = DNAStrategy()
 
-    def validate_strategy(self, data: pd.DataFrame) -> Dict[str, float]:
+    def validate_strategy(self, data: pd.DataFrame, genes: Dict) -> Dict[str, float]:
         """Valida la strategia su un set di dati.
         
         Args:
             data: DataFrame con i dati OHLCV
+            genes: Dizionario dei geni da utilizzare
             
         Returns:
             Dict[str, float]: Metriche di validazione
@@ -52,7 +59,7 @@ class DNAOptimization(DNABase):
             signals = np.zeros(len(data))
             for i in range(len(data)):
                 try:
-                    signals[i] = self.get_strategy_signal(data.iloc[:i+1])
+                    signals[i] = self._strategy.get_strategy_signal(data.iloc[:i+1], genes)
                 except Exception as e:
                     logger.error(f"Errore nel calcolo segnale: {str(e)}")
                     signals[i] = 0
@@ -97,16 +104,9 @@ class DNAOptimization(DNABase):
                 'win_rate': win_rate
             }
             
-            # Aggiorna le metriche direttamente
-            self.strategy_metrics.total_return = total_return
-            self.strategy_metrics.volatility = volatility
-            self.strategy_metrics.sharpe_ratio = sharpe
-            self.strategy_metrics.max_drawdown = max_drawdown
-            self.strategy_metrics.num_trades = num_trades
-            self.strategy_metrics.win_rate = win_rate
-            
-            # Salva stato dopo validazione
-            self.save_state()
+            # Aggiorna le metriche
+            for key, value in metrics.items():
+                setattr(self.strategy_metrics, key, value)
             
             logger.info(f"Validazione completata: {metrics}")
             return metrics
@@ -115,11 +115,12 @@ class DNAOptimization(DNABase):
             logger.error(f"Errore nella validazione: {str(e)}")
             raise ValueError(f"Errore nella validazione: {str(e)}")
         
-    def optimize_strategy(self, data: pd.DataFrame) -> None:
+    def optimize_strategy(self, data: pd.DataFrame, genes: Dict) -> None:
         """Ottimizza tutti i geni della strategia.
         
         Args:
             data: DataFrame con i dati OHLCV
+            genes: Dizionario dei geni da utilizzare
         """
         logger.info("Avvio ottimizzazione strategia")
         
@@ -136,23 +137,17 @@ class DNAOptimization(DNABase):
         test_data = data.iloc[train_size:]
         
         # Ottimizza ogni gene sul training set
-        for gene in self.genes.values():
+        for gene in genes.values():
             try:
                 gene.optimize_params(train_data)
             except Exception as e:
                 logger.error(f"Errore nell'ottimizzazione del gene {gene.name}: {str(e)}")
             
         # Valida su test set
-        test_metrics = self.validate_strategy(test_data)
+        test_metrics = self.validate_strategy(test_data, genes)
         
         # Registra latenza
         latency = (time.time() - start_time) * 1000  # ms
-        self.performance_metrics.record_execution_latency(latency)
-        
-        # Aggiorna metriche sistema
-        self.performance_metrics.update_system_metrics()
-        
-        # Salva stato dopo ottimizzazione
-        self.save_state()
+        self.performance_metrics.execution_latency = latency
         
         logger.info(f"Ottimizzazione completata, metriche test: {test_metrics}")

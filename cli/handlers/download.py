@@ -145,10 +145,16 @@ def handle_download(args):
                     progress.update(total_task, advance=1)
                     progress.update(operation_task, visible=False, completed=0)
                     
+                    # Calcola i giorni corrispondenti
+                    days = downloader._calculate_days_from_candles(
+                        series['timeframe'], 
+                        series['candles']
+                    )
+                    
                     # Mostra info sul completamento
                     print_success(f"{symbol_desc} completato")
-                    console.print(f"   Candele scaricate: {series['candles']}")
-                    logger.debug(f"{symbol_desc} completato - Candele scaricate: {series['candles']}")
+                    console.print(f"   Candele scaricate: {series['candles']} (giorni: {days:.1f})")
+                    logger.debug(f"{symbol_desc} completato - Candele: {series['candles']}, Giorni: {days:.1f}")
                     
                 except DNADataError as e:
                     logger.error(f"Errore durante il download di {series['symbol']}: {str(e)}")
