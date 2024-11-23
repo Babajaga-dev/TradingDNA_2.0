@@ -3,7 +3,7 @@
 # Capital Manager Configuration
 capital_manager:
   initial_capital: 10000.0  # Starting capital amount
-  risk_limit: 0.02         # Maximum risk per trade (2%)
+  risk_limit: 0.50         # Maximum risk per trade (10%)
   min_allocation: 1000.0   # Minimum capital allocation per strategy
   max_strategies: 5        # Maximum number of concurrent strategies
 

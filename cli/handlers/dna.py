@@ -21,6 +21,12 @@ from core.dna.pattern_recognition import PatternRecognition
 
 logger = get_component_logger('DNAHandler')
 
+# Funzione wrapper per accesso ai dati di mercato
+def load_market_data(pair: str = "BTC/USDT", timeframe: str = "1h") -> pd.DataFrame:
+    """Load market data from parquet file."""
+    handler = DNAHandler()
+    return handler._load_market_data(pair, timeframe)
+
 class DNAHandler:
     """Handler class for DNA System operations."""
     
@@ -323,3 +329,197 @@ class DNAHandler:
             logger.error(f"Errore durante calcolo score: {str(e)}")
             print_error(f"Errore: {str(e)}")
             raise
+
+    def handle_backtest(self) -> None:
+        """Handle DNA backtest."""
+        try:
+            if not self.dna.genes:
+                print_error("Nessun gene presente. Esegui 'dna init' prima")
+                return
+
+            # Load historical data
+            data = self._load_market_data()
+            
+            console.print("\n[cyan]Avvio backtest DNA...[/cyan]\n")
+            
+            with show_progress("Backtest in corso") as progress:
+                task = progress.add_task("Analisi...", total=100)
+                
+                # Simulate trading on historical data
+                signals = []
+                returns = []
+                trades = []
+                
+                for i in range(len(data)-1):
+                    current_data = data.iloc[:i+1]
+                    signal = self.dna.get_strategy_signal(current_data)
+                    price_change = (data.iloc[i+1]['close'] - data.iloc[i]['close']) / data.iloc[i]['close']
+                    
+                    signals.append(signal)
+                    returns.append(price_change if signal > 0.3 else -price_change if signal < -0.3 else 0)
+                    
+                    if abs(signal) > 0.3:
+                        trades.append({
+                            'timestamp': data.index[i],
+                            'type': 'BUY' if signal > 0.3 else 'SELL',
+                            'price': data.iloc[i]['close'],
+                            'signal': signal
+                        })
+                    
+                    progress.update(task, advance=100/len(data))
+            
+            # Calculate performance metrics
+            total_return = sum(returns)
+            win_trades = sum(1 for r in returns if r > 0)
+            total_trades = sum(1 for r in returns if r != 0)
+            win_rate = win_trades / total_trades if total_trades > 0 else 0
+            
+            # Create results table
+            results_table = Table(title="Risultati Backtest", border_style="cyan")
+            results_table.add_column("Metrica", style="cyan")
+            results_table.add_column("Valore", style="white")
+            
+            results_table.add_row("Periodo", f"{data.index[0].strftime('%Y-%m-%d')} - {data.index[-1].strftime('%Y-%m-%d')}")
+            results_table.add_row("Rendimento Totale", f"{total_return*100:.2f}%")
+            results_table.add_row("Numero Trade", str(total_trades))
+            results_table.add_row("Win Rate", f"{win_rate*100:.1f}%")
+            
+            console.print(results_table)
+            console.print("")
+            
+            # Create trades table
+            if trades:
+                trades_table = Table(title="Ultimi Trade", border_style="cyan")
+                trades_table.add_column("Data", style="cyan")
+                trades_table.add_column("Tipo", style="white")
+                trades_table.add_column("Prezzo", style="white")
+                trades_table.add_column("Segnale", style="white")
+                
+                for trade in trades[-5:]:  # Show last 5 trades
+                    trades_table.add_row(
+                        trade['timestamp'].strftime('%Y-%m-%d %H:%M'),
+                        "🟢 BUY" if trade['type'] == 'BUY' else "🔴 SELL",
+                        f"{trade['price']:.2f}",
+                        f"{abs(trade['signal']):.2f}"
+                    )
+                
+                console.print(trades_table)
+            
+            logger.info("Backtest completato")
+            print_success("Backtest completato con successo")
+            
+        except Exception as e:
+            logger.error(f"Errore durante backtest: {str(e)}")
+            print_error(f"Errore: {str(e)}")
+            raise
+            
+    def handle_config(self) -> None:
+        """Handle DNA configuration."""
+        try:
+            # Load current configuration
+            config = load_config('dna.yaml')
+            
+            # Create configuration table
+            config_table = Table(title="Configurazione DNA", border_style="cyan")
+            config_table.add_column("Parametro", style="cyan")
+            config_table.add_column("Valore", style="white")
+            config_table.add_column("Descrizione", style="white")
+            
+            # Add gene configurations
+            for gene_name, params in config['indicators'].items():
+                config_table.add_row(
+                    f"[cyan]{gene_name.upper()}[/]",
+                    "",
+                    "Parametri indicatore"
+                )
+                for param_name, value in params.items():
+                    config_table.add_row(
+                        f"  {param_name}",
+                        str(value),
+                        self._get_param_description(gene_name, param_name)
+                    )
+                config_table.add_row("", "", "")
+            
+            console.print("\n")
+            console.print(config_table)
+            console.print("\n")
+            
+            # Ask if user wants to modify configuration
+            choice = console.input("\nModificare la configurazione? [cyan][s/N][/]: ").lower()
+            
+            if choice == 's':
+                self._modify_config(config)
+            
+            logger.info("Configurazione completata")
+            
+        except Exception as e:
+            logger.error(f"Errore durante configurazione: {str(e)}")
+            print_error(f"Errore: {str(e)}")
+            raise
+            
+    def _get_param_description(self, gene_name: str, param_name: str) -> str:
+        """Get parameter description."""
+        descriptions = {
+            'rsi': {
+                'period': 'Periodo per il calcolo RSI',
+                'overbought': 'Livello di ipercomprato',
+                'oversold': 'Livello di ipervenduto'
+            },
+            'macd': {
+                'fast_period': 'Periodo media mobile veloce',
+                'slow_period': 'Periodo media mobile lenta',
+                'signal_period': 'Periodo linea del segnale'
+            },
+            'bollinger': {
+                'period': 'Periodo per le bande',
+                'std_dev': 'Deviazioni standard'
+            },
+            'volume': {
+                'period': 'Periodo per la media mobile',
+                'threshold': 'Soglia variazione volume'
+            },
+            'pattern_recognition': {
+                'min_pattern_length': 'Lunghezza minima pattern',
+                'max_pattern_length': 'Lunghezza massima pattern',
+                'similarity_threshold': 'Soglia similarità'
+            }
+        }
+        
+        return descriptions.get(gene_name, {}).get(param_name, "")
+        
+    def _modify_config(self, config: Dict) -> None:
+        """Modify DNA configuration."""
+        modified = False
+        
+        for gene_name, params in config['indicators'].items():
+            console.print(f"\n[cyan]Modifica parametri {gene_name.upper()}[/]")
+            
+            for param_name, value in params.items():
+                new_value = console.input(
+                    f"{param_name} [{value}]: "
+                ).strip()
+                
+                if new_value:
+                    try:
+                        # Convert to appropriate type
+                        if isinstance(value, int):
+                            params[param_name] = int(new_value)
+                        elif isinstance(value, float):
+                            params[param_name] = float(new_value)
+                        else:
+                            params[param_name] = new_value
+                        modified = True
+                    except ValueError:
+                        print_error(f"Valore non valido per {param_name}")
+                        continue
+        
+        if modified:
+            # Save configuration
+            config_path = Path("config/dna.yaml")
+            with open(config_path, 'w') as f:
+                import yaml
+                yaml.dump(config, f, default_flow_style=False)
+            print_success("Configurazione salvata con successo")
+            
+            # Reinitialize DNA with new configuration
+            self.handle_init()

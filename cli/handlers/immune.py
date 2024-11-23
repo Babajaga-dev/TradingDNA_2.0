@@ -26,35 +26,35 @@ class ImmuneHandler:
         self.sample_positions = [
             {
                 'symbol': 'BTC/USDT',
-                'size': 1.0,
-                'entry_price': 40000.0,
-                'current_price': 41000.0,
-                'unrealized_pnl': 1000.0,
+                'size': float(1.0),
+                'entry_price': float(40000.0),
+                'current_price': float(41000.0),
+                'unrealized_pnl': float(1000.0),
                 'exchange': 'binance',
-                'volatility': 0.15
+                'volatility': float(0.15)
             },
             {
                 'symbol': 'ETH/USDT',
-                'size': 10.0,
-                'entry_price': 2800.0,
-                'current_price': 2900.0,
-                'unrealized_pnl': 1000.0,
+                'size': float(10.0),
+                'entry_price': float(2800.0),
+                'current_price': float(2900.0),
+                'unrealized_pnl': float(1000.0),
                 'exchange': 'kraken',
-                'volatility': 0.12
+                'volatility': float(0.12)
             }
         ]
         
         # Update exchange health metrics
         self.immune_system._exchange_health = {
             'binance': {
-                'uptime': 0.99,
-                'api_response_time': 100,
-                'error_rate': 0.01
+                'uptime': float(0.99),
+                'api_response_time': float(100),
+                'error_rate': float(0.01)
             },
             'kraken': {
-                'uptime': 0.95,
-                'api_response_time': 300,
-                'error_rate': 0.05
+                'uptime': float(0.95),
+                'api_response_time': float(300),
+                'error_rate': float(0.05)
             }
         }
     
@@ -159,15 +159,22 @@ class ImmuneHandler:
             protection_table.add_column("Scale Out", justify="right")
             
             for position in self.sample_positions:
-                protection = self.immune_system.get_position_protection(position)
+                # Aggiungi dati di mercato simulati
+                market_data = {
+                    'price': float(position['current_price']),
+                    'volatility': float(position['volatility']),
+                    'trend': float(0.0)  # Trend neutro per i dati di esempio
+                }
+                
+                protection = self.immune_system.get_position_protection(position, market_data)
                 
                 protection_table.add_row(
                     position['symbol'],
-                    f"${position['current_price']:,.2f}",
-                    f"${protection.get('stop_loss', 0):,.2f}",
-                    f"${protection.get('take_profit', 0):,.2f}",
-                    f"${protection.get('trailing_activation', 0):,.2f}",
-                    f"${protection.get('scale_out_target', 0):,.2f}"
+                    f"${float(position['current_price']):,.2f}",
+                    f"${float(protection.get('stop_loss', 0)):,.2f}",
+                    f"${float(protection.get('take_profit', 0)):,.2f}",
+                    f"${float(protection.get('trailing_activation', 0)):,.2f}",
+                    f"${float(protection.get('scale_out_target', 0)):,.2f}"
                 )
                 
             console.print(protection_table)
@@ -190,10 +197,10 @@ class ImmuneHandler:
             for exchange, metrics in self.immune_system._exchange_health.items():
                 health_table.add_row(
                     exchange,
-                    f"{metrics.get('uptime', 0.0)*100:.1f}%",
-                    f"{metrics.get('api_response_time', 0):.0f}ms",
-                    f"{metrics.get('error_rate', 0.0)*100:.1f}%",
-                    f"{self.immune_system._get_exchange_health_score(exchange)*100:.1f}%"
+                    f"{float(metrics.get('uptime', 0.0))*100:.1f}%",
+                    f"{float(metrics.get('api_response_time', 0)):.0f}ms",
+                    f"{float(metrics.get('error_rate', 0.0))*100:.1f}%",
+                    f"{float(self.immune_system._get_exchange_health_score(exchange))*100:.1f}%"
                 )
                 
             console.print(health_table)
@@ -210,9 +217,9 @@ class ImmuneHandler:
             
             health_table = Table(show_header=False, show_edge=False, box=None)
             health_table.add_column(justify="left")
-            health_table.add_row(f"Risk Management: {health['risk_management']*100:.1f}%")
-            health_table.add_row(f"Defense Efficiency: {health['defense_efficiency']*100:.1f}%")
-            health_table.add_row(f"System Stability: {health['system_stability']*100:.1f}%")
+            health_table.add_row(f"Risk Management: {float(health['risk_management'])*100:.1f}%")
+            health_table.add_row(f"Defense Efficiency: {float(health['defense_efficiency'])*100:.1f}%")
+            health_table.add_row(f"System Stability: {float(health['system_stability'])*100:.1f}%")
             
             health_panel = Panel(
                 health_table,

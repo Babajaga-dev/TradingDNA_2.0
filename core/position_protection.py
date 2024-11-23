@@ -65,9 +65,14 @@ class PositionProtection:
         Returns:
             Tuple of (stop_loss, warning_level)
         """
+        # Ensure numeric types
+        entry_price = float(entry_price)
+        current_price = float(current_price)
+        volatility = float(volatility)
+        
         # Base stop distance adjusted by volatility
-        base_distance = self._config['max_stop_distance']
-        volatility_factor = 1 + (volatility * self._config['volatility_multiplier'])
+        base_distance = float(self._config['max_stop_distance'])
+        volatility_factor = 1 + (volatility * float(self._config['volatility_multiplier']))
         stop_distance = base_distance * volatility_factor
         
         # Calculate stop levels from current price
@@ -75,7 +80,7 @@ class PositionProtection:
         warning_level = current_price * (1 - stop_distance * 0.7)
         
         # Ensure minimum distance from entry
-        min_stop = entry_price * (1 - self._config['max_stop_distance'])
+        min_stop = entry_price * (1 - float(self._config['max_stop_distance']))
         stop_loss = max(stop_loss, min_stop)
         warning_level = max(warning_level, min_stop * 1.02)
         
@@ -98,6 +103,11 @@ class PositionProtection:
         Returns:
             Tuple of (take_profit, trailing_activation)
         """
+        # Ensure numeric types
+        entry_price = float(entry_price)
+        stop_loss = float(stop_loss)
+        market_trend = float(market_trend)
+        
         # Calculate base risk percentage
         risk_percent = abs(entry_price - stop_loss) / entry_price
         
@@ -105,12 +115,12 @@ class PositionProtection:
         trend_adjustment = max(0.8, min(1.2, 1 + market_trend))
         
         # Calculate base target percentages from min_profit_target
-        base_take_profit = self._config['min_profit_target']
-        base_trailing = self._config['min_profit_target'] * 0.75
+        base_take_profit = float(self._config['min_profit_target'])
+        base_trailing = float(self._config['min_profit_target']) * 0.75
         
         # Add risk-based component
-        take_profit_percent = (base_take_profit + risk_percent) * self._config['profit_take_multiplier'] * trend_adjustment
-        trailing_percent = (base_trailing + risk_percent * 0.5) * self._config['trailing_stop_activation'] * trend_adjustment
+        take_profit_percent = (base_take_profit + risk_percent) * float(self._config['profit_take_multiplier']) * trend_adjustment
+        trailing_percent = (base_trailing + risk_percent * 0.5) * float(self._config['trailing_stop_activation']) * trend_adjustment
         
         # Calculate absolute levels
         take_profit = entry_price * (1 + take_profit_percent)
@@ -139,8 +149,13 @@ class PositionProtection:
         Returns:
             Dictionary containing scale out and scale in levels with sizes
         """
+        # Ensure numeric types
+        entry_price = float(entry_price)
+        position_size = float(position_size)
+        market_volatility = float(market_volatility)
+        
         # Adjust scale threshold based on volatility
-        scale_threshold = self._config['position_scale_threshold'] * (
+        scale_threshold = float(self._config['position_scale_threshold']) * (
             1 + market_volatility
         )
         
@@ -150,9 +165,9 @@ class PositionProtection:
         
         # Calculate scaling steps
         scale_levels = {}
-        step_size = position_size * self._config['scale_ratio']
+        step_size = position_size * float(self._config['scale_ratio'])
         
-        for i in range(self._config['scale_out_steps']):
+        for i in range(int(self._config['scale_out_steps'])):
             # Scale out levels (take profit scaling)
             level_price = scale_out_base * (1 + (i * 0.5 * scale_threshold))
             scale_levels[f'scale_out_{i+1}'] = {
@@ -184,11 +199,11 @@ class PositionProtection:
         Returns:
             Adjusted protection levels
         """
-        trend = market_data.get('trend', 0)
-        volatility = market_data.get('volatility', 0)
+        trend = float(market_data.get('trend', 0))
+        volatility = float(market_data.get('volatility', 0))
         
         # Only adapt if trend is significant
-        if abs(trend) > self._config['market_trend_threshold']:
+        if abs(trend) > float(self._config['market_trend_threshold']):
             # Calculate adjustment factor
             adjustment = trend * volatility
             
@@ -198,12 +213,12 @@ class PositionProtection:
                 if isinstance(level_value, dict):
                     # Handle scaling levels
                     adjusted_levels[level_name] = {
-                        'price': level_value['price'] * (1 + adjustment),
-                        'size': level_value['size']
+                        'price': float(level_value['price']) * (1 + adjustment),
+                        'size': float(level_value['size'])
                     }
                 else:
                     # Handle simple price levels
-                    adjusted_levels[level_name] = level_value * (1 + adjustment)
+                    adjusted_levels[level_name] = float(level_value) * (1 + adjustment)
                     
             return adjusted_levels
             
@@ -224,53 +239,62 @@ class PositionProtection:
         Returns:
             ProtectionLevels object with all calculated levels
         """
-        entry_price = position['entry_price']
-        current_price = market_data.get('price', entry_price)
-        volatility = market_data.get('volatility', 0)
-        market_trend = market_data.get('trend', 0)
-        
-        # With minimal data, use entry price as reference
-        reference_price = entry_price if len(market_data) <= 1 else current_price
-        
-        # Calculate base protection levels
-        stop_loss, warning_level = self.calculate_dynamic_stops(
-            entry_price,
-            reference_price,
-            volatility
-        )
-        
-        take_profit, trailing_stop = self.calculate_profit_targets(
-            entry_price,
-            stop_loss,
-            market_trend
-        )
-        
-        scaling_levels = self.calculate_scaling_levels(
-            entry_price,
-            position['size'],
-            volatility
-        )
-        
-        # Combine all levels
-        protection_levels = {
-            'stop_loss': stop_loss,
-            'warning_level': warning_level,
-            'take_profit': take_profit,
-            'trailing_stop': trailing_stop,
-            **scaling_levels
-        }
-        
-        # Adapt to market conditions
-        adjusted_levels = self.adapt_to_market_conditions(
-            protection_levels,
-            market_data
-        )
-        
-        return ProtectionLevels(
-            stop_loss=adjusted_levels['stop_loss'],
-            warning_level=adjusted_levels['warning_level'],
-            take_profit=adjusted_levels['take_profit'],
-            trailing_stop=adjusted_levels['trailing_stop'],
-            scale_out_level=adjusted_levels['scale_out_1']['price'],
-            scale_in_level=adjusted_levels['scale_in_1']['price']
-        )
+        try:
+            # Ensure numeric types for critical values
+            entry_price = float(position['entry_price'])
+            current_price = float(market_data.get('price', entry_price))
+            volatility = float(market_data.get('volatility', 0))
+            market_trend = float(market_data.get('trend', 0))
+            position_size = float(position['size'])
+            
+            # With minimal data, use entry price as reference
+            reference_price = entry_price if len(market_data) <= 1 else current_price
+            
+            # Calculate base protection levels
+            stop_loss, warning_level = self.calculate_dynamic_stops(
+                entry_price,
+                reference_price,
+                volatility
+            )
+            
+            take_profit, trailing_stop = self.calculate_profit_targets(
+                entry_price,
+                stop_loss,
+                market_trend
+            )
+            
+            scaling_levels = self.calculate_scaling_levels(
+                entry_price,
+                position_size,
+                volatility
+            )
+            
+            # Combine all levels
+            protection_levels = {
+                'stop_loss': stop_loss,
+                'warning_level': warning_level,
+                'take_profit': take_profit,
+                'trailing_stop': trailing_stop,
+                **scaling_levels
+            }
+            
+            # Adapt to market conditions
+            adjusted_levels = self.adapt_to_market_conditions(
+                protection_levels,
+                market_data
+            )
+            
+            return ProtectionLevels(
+                stop_loss=float(adjusted_levels['stop_loss']),
+                warning_level=float(adjusted_levels['warning_level']),
+                take_profit=float(adjusted_levels['take_profit']),
+                trailing_stop=float(adjusted_levels['trailing_stop']),
+                scale_out_level=float(adjusted_levels['scale_out_1']['price']),
+                scale_in_level=float(adjusted_levels['scale_in_1']['price'])
+            )
+            
+        except (ValueError, TypeError) as e:
+            logger.error(f"Errore durante il calcolo dei livelli di protezione: {str(e)}")
+            logger.error(f"Position: {position}")
+            logger.error(f"Market data: {market_data}")
+            raise ValueError(f"Errore nella conversione dei valori numerici: {str(e)}")

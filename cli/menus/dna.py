@@ -35,7 +35,9 @@ class DNAMenu:
             '5': ("Composizione", self._handle_composition),
             '6': ("Analisi Pattern", self._handle_pattern_analysis),
             '7': ("Indicatori Tecnici", self._handle_indicators),
-            '8': ("DNA Scoring", self._handle_scoring)
+            '8': ("DNA Scoring", self._handle_scoring),
+            '9': ("Backtest", self._handle_backtest),
+            '10': ("Configurazione", self._handle_config)
         }
         
         if choice in valid_choices:
@@ -71,6 +73,8 @@ class DNAMenu:
         table.add_row("[6]", "📊 Analisi Pattern   - Pattern Recognition")
         table.add_row("[7]", "📉 Indicatori       - Analisi tecnica")
         table.add_row("[8]", "🎯 Scoring          - Performance DNA")
+        table.add_row("[9]", "📊 Backtest         - Test storico")
+        table.add_row("[10]", "⚙️  Configurazione   - Parametri sistema")
         table.add_row("", "")
         table.add_row("[0]", "⬅️  Torna al menu principale")
         
@@ -152,3 +156,11 @@ class DNAMenu:
     def _handle_scoring(self) -> None:
         """Handle DNA scoring."""
         self.handler.handle_scoring()
+        
+    def _handle_backtest(self) -> None:
+        """Handle DNA backtest."""
+        self.handler.handle_backtest()
+        
+    def _handle_config(self) -> None:
+        """Handle DNA configuration."""
+        self.handler.handle_config()

@@ -1,9 +1,14 @@
 """Main menu interface for TradingDNA."""
 from typing import Optional
 import logging
+import os
+import shutil
+import time
+from pathlib import Path
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.prompt import Confirm
 
 from cli.menus.dna import DNAMenu
 from cli.menus.immune import ImmuneMenu
@@ -62,17 +67,19 @@ class MainMenu:
         """Display the main menu options with enhanced visual feedback."""
         # Menu options
         menu_text = (
-            "🧬 [bold cyan]TradingDNA 2.0[/bold cyan]\n\n"
+            "🧬 [bold cyan]TradingDNA 2.0[/bold cyan]\n\n\n"
             "1. [green]Sistema DNA[/green]\n"
             "2. [blue]Sistema Immunitario[/blue]\n"
             "3. [yellow]Sistema Metabolismo[/yellow]\n"
-            "4. [magenta]Sistema Nervoso[/magenta]\n"
+            "4. 🧠 [magenta]Sistema Nervoso[/magenta]\n"
             "5. [red]Sistema Endocrino[/red] [dim](In Sviluppo)[/dim]\n"
-            "6. [purple]Sistema Riproduttivo[/purple] [dim](In Sviluppo)[/dim]\n"
+            "6. [purple]Sistema Riproduttivo[/purple] [dim](In Sviluppo)[/dim]\n\n"
             "7. [cyan]Configurazione[/cyan]\n"
             "8. [cyan]Download Dati[/cyan]\n"
             "9. [cyan]Log e Monitor[/cyan]\n"
-            "0. [white]Esci[/white]\n\n"
+            "───────────────────────\n\n\n\n"
+            "R. ⟲ [red]Reset Sistema[/red]\n"
+            "0. 🚪 [white]Esci[/white]\n\n\n"
             "Seleziona un'opzione:"
         )
         
@@ -109,6 +116,8 @@ class MainMenu:
                 input("\nPremi INVIO per continuare...")
             elif choice == "9":
                 handle_log()
+            elif choice.upper() == "R":
+                self._handle_reset_system()
             elif choice == "0":
                 console.print("\n[yellow]Arrivederci![/yellow]")
                 return False
@@ -132,6 +141,90 @@ class MainMenu:
             if not submenu.handle_choice(choice):
                 break
         console.clear()  # Pulisce lo schermo prima di tornare al menu principale
+    
+    def _close_all_handlers(self) -> None:
+        """Close all logging handlers."""
+        # Chiudi gli handler del root logger
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            try:
+                handler.close()
+                root_logger.removeHandler(handler)
+            except:
+                pass
+
+        # Chiudi gli handler dei moduli configurati
+        loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+        for logger in loggers:
+            try:
+                for handler in logger.handlers[:]:
+                    try:
+                        handler.close()
+                        logger.removeHandler(handler)
+                    except:
+                        pass
+            except:
+                pass
+
+    def _handle_reset_system(self) -> None:
+        """Handle system reset command."""
+        try:
+            # Chiedi conferma all'utente
+            if not Confirm.ask("\n[red]⚠ Questa operazione cancellerà tutti i dati e i log del sistema. Continuare?[/red]"):
+                console.print("\n[yellow]Reset sistema annullato[/yellow]")
+                input("\nPremi INVIO per continuare...")
+                return
+
+            # Chiudi tutti gli handler di logging
+            self._close_all_handlers()
+
+            # Attendi che i file vengano rilasciati
+            time.sleep(1)
+
+            # Percorsi delle cartelle da resettare
+            data_dir = Path("data")
+            logs_dir = Path("logs")
+
+            # Cancella il contenuto della cartella data
+            if data_dir.exists():
+                try:
+                    shutil.rmtree(data_dir)
+                    data_dir.mkdir()
+                    console.print("\n[green]✓ Cartella data resettata[/green]")
+                except Exception as e:
+                    console.print(f"\n[red]Errore reset cartella data: {str(e)}[/red]")
+
+            # Cancella il contenuto della cartella logs
+            if logs_dir.exists():
+                try:
+                    # Rimuovi i file uno alla volta
+                    for file in logs_dir.glob("*"):
+                        try:
+                            if file.is_file():
+                                file.unlink()
+                        except:
+                            pass
+                    console.print("[green]✓ Cartella logs resettata[/green]")
+                except Exception as e:
+                    console.print(f"\n[red]Errore reset cartella logs: {str(e)}[/red]")
+
+            # Reinizializza il logging
+            from utils.logger_base import setup_logging
+            setup_logging()
+
+            console.print("\n[green]✓ Reset sistema completato con successo[/green]")
+            input("\nPremi INVIO per continuare...")
+
+        except Exception as e:
+            console.print(f"\n[red]Errore durante il reset: {str(e)}[/red]")
+            input("\nPremi INVIO per continuare...")
+            
+            # Assicurati che il logging sia reinizializzato anche in caso di errore
+            try:
+                from utils.logger_base import setup_logging
+                setup_logging()
+            except:
+                pass
     
     def run(self) -> None:
         """Run the main menu loop."""
